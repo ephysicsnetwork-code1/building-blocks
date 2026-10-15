@@ -93,7 +93,7 @@ export function ErrorCard({ title, text, supportUrl, support }: { title: string;
       <h2 className="mt-3 text-xl font-bold">{title}</h2>
       <p className="mt-2 text-sm text-muted-foreground">{text}</p>
       <a href={supportUrl} target="_blank" rel="noreferrer" className="btn-glow mt-6">
-        Contact {support}
+        Contact admin
       </a>
     </div>
   );
