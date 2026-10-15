@@ -63,7 +63,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
         {link ? (
           <a href={link} target="_blank" rel="noreferrer" className="btn-glow mt-6">Join the Telegram group</a>
         ) : (
-          <a href={supportUrl} target="_blank" rel="noreferrer" className="btn-glow mt-6">Contact {support}</a>
+          <a href={supportUrl} target="_blank" rel="noreferrer" className="btn-glow mt-6">Contact admin</a>
         )}
       </div>
     );

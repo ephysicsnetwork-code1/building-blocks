@@ -88,7 +88,7 @@ function Index() {
       <footer className="mt-10 text-center text-xs text-muted-foreground">
         Need help?{" "}
         <a href={supportUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-          {support}
+          Contact us
         </a>
       </footer>
     </div>
