@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/_serverFn/:path*", "destination": "https://parent-portal-approved.lovable.app/_serverFn/:path*" }
+  ]
+}
