@@ -62,3 +62,42 @@ export async function telegramCall(method: string, body: Record<string, unknown>
   });
   return (await res.json()) as { ok: boolean; result?: any; description?: string };
 }
+
+import { MAX_FAILED_ATTEMPTS, normalizeName } from "./school-constants";
+
+/** Returns true when this name is banned on the public side. */
+export async function isBanned(name: string) {
+  const db = await getDb();
+  const { data } = await db.from("verification_attempts").select("banned").eq("subject", normalizeName(name)).maybeSingle();
+  return !!data?.banned;
+}
+
+/** Records a failed attempt; bans and raises an admin alert on the 3rd consecutive failure. */
+export async function recordFailure(name: string, context: string) {
+  const db = await getDb();
+  const subject = normalizeName(name);
+  const { data } = await db.from("verification_attempts").select("failed_count,banned").eq("subject", subject).maybeSingle();
+  const count = (data?.failed_count ?? 0) + 1;
+  const ban = count >= MAX_FAILED_ATTEMPTS;
+  await db.from("verification_attempts").upsert({
+    subject,
+    display_name: name.trim().slice(0, 120),
+    failed_count: count,
+    banned: ban || !!data?.banned,
+    banned_at: ban ? new Date().toISOString() : null,
+    last_attempt_at: new Date().toISOString(),
+  });
+  if (ban && !data?.banned) {
+    await db.from("admin_alerts").insert({
+      kind: "ban",
+      subject,
+      message: `"${name.trim().slice(0, 120)}" failed verification ${count} times in a row (${context}) and was locked.`,
+    });
+  }
+  return { count, banned: ban, remaining: Math.max(0, MAX_FAILED_ATTEMPTS - count) };
+}
+
+export async function clearFailures(name: string) {
+  const db = await getDb();
+  await db.from("verification_attempts").delete().eq("subject", normalizeName(name));
+}
