@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot,
+  adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
 } from "@/lib/portal.functions";
+import { ShieldCheck, X, ShieldAlert } from "lucide-react";
+import { GlassIcon } from "./GlassIcon";
 
 type Data = Awaited<ReturnType<typeof adminGetData>>;
 const KEY = "bh_admin_token";
@@ -42,8 +44,8 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (t
     <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" role="dialog" aria-modal>
       <form onSubmit={submit} className="glass glow w-full max-w-sm space-y-4 rounded-2xl p-6" autoComplete="off">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">🔐 Admin login</h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground" aria-label="Close">✕</button>
+          <h2 className="flex items-center gap-3 text-xl font-bold"><GlassIcon icon={ShieldCheck} size="sm" /> Admin login</h2>
+          <button type="button" onClick={onClose} className="text-muted-foreground" aria-label="Close"><X size={18} /></button>
         </div>
         <input className="field" placeholder="Username" value={u} onChange={(e) => setU(e.target.value)} autoComplete="off" />
         <input className="field" type="password" placeholder="Password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" />
@@ -53,7 +55,7 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (t
   );
 }
 
-type View = "parents" | "students" | "teachers" | "settings";
+type View = "security" | "parents" | "students" | "teachers" | "settings";
 
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const get = useServerFn(adminGetData);
@@ -61,8 +63,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const decide = useServerFn(adminDecideParent);
   const resetS = useServerFn(adminResetStudent);
   const testBot = useServerFn(adminTestBot);
+  const unban = useServerFn(adminUnban);
+  const resolve = useServerFn(adminResolveAlert);
   const [data, setData] = useState<Data | null>(null);
-  const [view, setView] = useState<View>("parents");
+  const [view, setView] = useState<View>("security");
   const [settings, setSettings] = useState({ telegram_link: "", support_handle: "", notify_chat_id: "" });
   const [q, setQ] = useState("");
 
@@ -83,6 +87,8 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
   const joined = new Map(data.joins.map((j) => [j.full_name, j]));
   const pending = data.parents.filter((p) => p.status === "pending");
+  const openAlerts = data.alerts.filter((a) => !a.resolved);
+  const banned = data.attempts.filter((a) => a.banned);
   const run = async (fn: () => Promise<unknown>, msg: string) => {
     try { await fn(); toast.success(msg); load(); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
   };
@@ -93,18 +99,61 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         <h2 className="text-xl font-bold">Admin dashboard</h2>
         <button className="btn-ghost text-sm" onClick={onLogout}>Log out</button>
       </div>
-      <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+      <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
         <Stat label="Students joined" value={data.joins.length} />
         <Stat label="Teacher visits" value={data.teacherAccess.length} />
         <Stat label="Pending parents" value={pending.length} />
+        <Stat label="Locked names" value={banned.length} />
       </div>
       <div className="mt-5 flex gap-2 overflow-x-auto">
-        {(["parents", "students", "teachers", "settings"] as View[]).map((v) => (
-          <button key={v} onClick={() => setView(v)} className={`btn-ghost whitespace-nowrap text-sm capitalize ${view === v ? "glow text-primary" : ""}`}>{v}</button>
+        {(["security", "parents", "students", "teachers", "settings"] as View[]).map((v) => (
+          <button key={v} onClick={() => setView(v)} className={`btn-ghost whitespace-nowrap text-sm capitalize ${view === v ? "glow text-primary" : ""}`}>{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</button>
         ))}
       </div>
 
+      {openAlerts.length > 0 && view !== "security" && (
+        <button onClick={() => setView("security")} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-warning/40 p-3 text-left text-sm">
+          <GlassIcon icon={ShieldAlert} size="sm" />
+          <span>{openAlerts.length} security alert(s) need review</span>
+        </button>
+      )}
+
       <div className="mt-4">
+        {view === "security" && (
+          <div className="space-y-5">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Alerts</h3>
+              <Table head={["When", "Alert", ""]}>
+                {data.alerts.map((a) => (
+                  <tr key={a.id} className={`border-t ${a.resolved ? "opacity-50" : ""}`}>
+                    <td className="p-2 whitespace-nowrap text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</td>
+                    <td className="p-2">{a.message}</td>
+                    <td className="p-2">{!a.resolved && <button className="text-primary" onClick={() => run(() => resolve({ data: { token, id: a.id } }), "Marked as reviewed")}>Dismiss</button>}</td>
+                  </tr>
+                ))}
+                {data.alerts.length === 0 && <Empty cols={3} />}
+              </Table>
+            </div>
+            <div>
+              <h3 className="mb-2 text-sm font-semibold">Failed attempts &amp; locked names</h3>
+              <Table head={["Name typed", "Failures", "Status", ""]}>
+                {data.attempts.map((a) => (
+                  <tr key={a.subject} className="border-t">
+                    <td className="p-2">{a.display_name}</td>
+                    <td className="p-2">{a.failed_count}</td>
+                    <td className={`p-2 ${a.banned ? "text-destructive" : "text-warning"}`}>{a.banned ? "Locked" : "Watching"}</td>
+                    <td className="p-2">
+                      <button className="text-success" onClick={() => run(() => unban({ data: { token, subject: a.subject } }), a.banned ? "Unbanned & re-added" : "Attempts cleared")}>
+                        {a.banned ? "Unban / Re-add" : "Clear"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {data.attempts.length === 0 && <Empty cols={4} />}
+              </Table>
+            </div>
+          </div>
+        )}
         {view === "parents" && (
           <Table head={["Parent", "Handle", "Student", "Status", ""]}>
             {data.parents.map((p) => (
