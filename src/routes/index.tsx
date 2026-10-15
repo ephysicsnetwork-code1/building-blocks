@@ -34,7 +34,7 @@ const TABS: { id: Tab; icon: LucideIcon; label: string; hint: string }[] = [
 
 function Index() {
   const [tab, setTab] = useState<Tab | null>(null);
-  const [support, setSupport] = useState("@Spaceanduniverse13");
+  const [support, setSupport] = useState("@bhsss_admin");
   const [sections, setSections] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
