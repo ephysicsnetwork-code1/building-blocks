@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { MAX_FAILED_ATTEMPTS, normalizeName } from "./school-constants";
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
 
@@ -63,7 +64,6 @@ export async function telegramCall(method: string, body: Record<string, unknown>
   return (await res.json()) as { ok: boolean; result?: any; description?: string };
 }
 
-import { MAX_FAILED_ATTEMPTS, normalizeName } from "./school-constants";
 
 /** Returns true when this name is banned on the public side. */
 export async function isBanned(name: string) {
