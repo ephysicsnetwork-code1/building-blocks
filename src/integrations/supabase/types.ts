@@ -14,7 +14,156 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_alerts: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          message: string
+          resolved: boolean
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          message: string
+          resolved?: boolean
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message?: string
+          resolved?: boolean
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      parent_requests: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          id: string
+          parent_name: string
+          status: string
+          student_name: string
+          telegram_handle: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          parent_name: string
+          status?: string
+          student_name: string
+          telegram_handle: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          parent_name?: string
+          status?: string
+          student_name?: string
+          telegram_handle?: string
+        }
+        Relationships: []
+      }
+      student_joins: {
+        Row: {
+          full_name: string
+          grade: string
+          joined_at: string
+          section: string
+          stream: string | null
+          telegram_handle: string
+        }
+        Insert: {
+          full_name: string
+          grade: string
+          joined_at?: string
+          section: string
+          stream?: string | null
+          telegram_handle: string
+        }
+        Update: {
+          full_name?: string
+          grade?: string
+          joined_at?: string
+          section?: string
+          stream?: string | null
+          telegram_handle?: string
+        }
+        Relationships: []
+      }
+      teacher_access: {
+        Row: {
+          accessed_at: string
+          full_name: string
+          id: string
+          telegram_handle: string
+        }
+        Insert: {
+          accessed_at?: string
+          full_name: string
+          id?: string
+          telegram_handle: string
+        }
+        Update: {
+          accessed_at?: string
+          full_name?: string
+          id?: string
+          telegram_handle?: string
+        }
+        Relationships: []
+      }
+      verification_attempts: {
+        Row: {
+          banned: boolean
+          banned_at: string | null
+          display_name: string
+          failed_count: number
+          last_attempt_at: string
+          subject: string
+        }
+        Insert: {
+          banned?: boolean
+          banned_at?: string | null
+          display_name: string
+          failed_count?: number
+          last_attempt_at?: string
+          subject: string
+        }
+        Update: {
+          banned?: boolean
+          banned_at?: string | null
+          display_name?: string
+          failed_count?: number
+          last_attempt_at?: string
+          subject?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
