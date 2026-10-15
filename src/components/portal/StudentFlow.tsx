@@ -1,36 +1,52 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { SCHOOL_DATABASE, GRADES, STREAM_GRADES, HANDLE_RE } from "@/lib/school-data";
+import { Lock } from "lucide-react";
+import { GRADES, STREAM_GRADES, HANDLE_RE, MAX_FAILED_ATTEMPTS } from "@/lib/school-constants";
 import { verifyStudent } from "@/lib/portal.functions";
 import { SecureReveal, ErrorCard } from "./SecureReveal";
+import { GlassIcon } from "./GlassIcon";
 
-type Result = { ok: true; link: string; name: string; handle: string } | { ok: false; reason: string };
+type Result =
+  | { ok: true; link: string; name: string; handle: string }
+  | { ok: false; reason: "not_found" | "already_joined" | "banned"; remaining?: number };
 
-export function StudentFlow({ supportUrl, support }: { supportUrl: string; support: string }) {
+export function StudentFlow({
+  supportUrl,
+  support,
+  sections,
+}: {
+  supportUrl: string;
+  support: string;
+  sections: Record<string, string[]>;
+}) {
   const verify = useServerFn(verifyStudent);
   const [grade, setGrade] = useState<string | null>(null);
   const [stream, setStream] = useState<"Natural" | "Social" | null>(null);
   const [section, setSection] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [query, setQuery] = useState("");
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   const needsStream = grade ? STREAM_GRADES.includes(grade) : false;
   const step = !grade ? 1 : needsStream && !stream ? 2 : !section ? 3 : 4;
-  const names = grade && section ? SCHOOL_DATABASE.students[grade]?.[section] ?? [] : [];
-  const filtered = names.filter((n) => n.toLowerCase().includes(query.toLowerCase()));
 
-  const reset = () => { setGrade(null); setStream(null); setSection(null); setName(""); setQuery(""); };
+  const reset = () => { setGrade(null); setStream(null); setSection(null); setName(""); setRemaining(null); };
 
   async function submit() {
+    if (name.trim().length < 2) { toast.error("Type your full official name"); return; }
     if (!HANDLE_RE.test(handle.trim())) { toast.error("Enter a valid Telegram handle, e.g. @username"); return; }
     setBusy(true);
     try {
-      const r = await verify({ data: { grade: grade!, stream, section: section!, name, handle } });
-      setResult(r as Result);
+      const r = (await verify({ data: { grade: grade!, stream, section: section!, name, handle } })) as Result;
+      if (!r.ok && r.reason === "not_found") {
+        setRemaining(r.remaining ?? null);
+        toast.error(`No match found. ${r.remaining ?? 0} attempt(s) left before this name is locked.`);
+      } else {
+        setResult(r);
+      }
     } catch {
       toast.error("Verification failed. Please try again.");
     } finally {
@@ -42,10 +58,12 @@ export function StudentFlow({ supportUrl, support }: { supportUrl: string; suppo
   if (result && !result.ok)
     return (
       <ErrorCard
-        title={result.reason === "already_joined" ? "Already verified" : "Not found"}
-        text={result.reason === "already_joined"
-          ? "This student has already used their one-time access. If this is a mistake, contact the admin."
-          : "We couldn't match your details to the school roster."}
+        title={result.reason === "already_joined" ? "Already joined" : "Name locked"}
+        text={
+          result.reason === "already_joined"
+            ? "This student has already joined. If this is a mistake, contact the admin."
+            : `Verification failed ${MAX_FAILED_ATTEMPTS} times for this name, so it has been locked. The admin has been notified and can restore access.`
+        }
         supportUrl={supportUrl}
         support={support}
       />
@@ -73,35 +91,33 @@ export function StudentFlow({ supportUrl, support }: { supportUrl: string; suppo
       )}
       {step === 3 && (
         <Grid label="Select your section">
-          {Object.keys(SCHOOL_DATABASE.students[grade!] ?? {}).map((s) => (
+          {(sections[grade!] ?? []).map((s) => (
             <button key={s} className="choice" onClick={() => setSection(s)}>Section {s}</button>
           ))}
         </Grid>
       )}
       {step === 4 && (
         <div className="mt-5 space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border p-3 text-xs text-muted-foreground">
+            <GlassIcon icon={Lock} size="sm" />
+            <span>
+              For privacy the class list is hidden. Type your full name exactly as registered at school.
+              After {MAX_FAILED_ATTEMPTS} wrong attempts the name is locked.
+            </span>
+          </div>
           <div>
-            <label className="text-sm font-semibold">Find your official name</label>
-            <input className="field mt-2" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
-            <div className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-xl border p-1">
-              {filtered.map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setName(n)}
-                  className={`block w-full rounded-lg px-3 py-2 text-left text-sm ${name === n ? "bg-accent text-primary" : "hover:bg-muted"}`}
-                >
-                  {n}
-                </button>
-              ))}
-              {filtered.length === 0 && <p className="p-3 text-sm text-muted-foreground">No match.</p>}
-            </div>
+            <label className="text-sm font-semibold">Your full official name</label>
+            <input className="field mt-2" placeholder="e.g. Abebe Kebede Tesfaye" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} autoComplete="off" />
+            {remaining !== null && (
+              <p className="mt-2 text-xs text-warning">{remaining} attempt(s) remaining</p>
+            )}
           </div>
           <div>
             <label className="text-sm font-semibold">Your Telegram handle</label>
             <input className="field mt-2" placeholder="@username" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={33} />
           </div>
-          <button className="btn-glow w-full" disabled={!name || busy} onClick={submit}>
-            {busy ? "Verifying…" : "Verify & reveal link"}
+          <button className="btn-glow w-full" disabled={!name.trim() || busy} onClick={submit}>
+            {busy ? "Verifying…" : "Verify & join"}
           </button>
         </div>
       )}
