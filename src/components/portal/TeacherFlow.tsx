@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { HANDLE_RE } from "@/lib/school-data";
+import { HANDLE_RE } from "@/lib/school-constants";
 import { verifyTeacher } from "@/lib/portal.functions";
 import { SecureReveal, ErrorCard } from "./SecureReveal";
 
