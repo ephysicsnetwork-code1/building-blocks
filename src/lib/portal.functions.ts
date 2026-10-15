@@ -265,3 +265,16 @@ export const adminResolveAlert = createServerFn({ method: "POST" })
     if (error) throw new Error("Update failed");
     return { ok: true };
   });
+
+export const searchStudents = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ q: z.string().trim().min(3).max(120) }).parse(d))
+  .handler(async ({ data }) => {
+    const { normalizeName } = await import("./school-constants");
+    const q = normalizeName(data.q);
+    return allStudents()
+      .filter((s) => {
+        const n = normalizeName(s.name);
+        return n.startsWith(q) || n.split(" ").some((w) => w.startsWith(q));
+      })
+      .slice(0, 5);
+  });
