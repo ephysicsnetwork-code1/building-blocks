@@ -49,7 +49,7 @@ export async function getSettings() {
   for (const r of data ?? []) map[r.key] = r.value;
   return {
     telegram_link: map["telegram_link"] ?? "",
-    support_handle: map["support_handle"] ?? "@Spaceanduniverse13",
+    support_handle: map["support_handle"] ?? "@bhsss_admin",
   };
 }
 
