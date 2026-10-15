@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Toaster } from "sonner";
-import logo from "@/assets/school-logo.jpg.asset.json";
+const logo = { url: "/school-logo.jpg" };
 import { getPublicSettings } from "@/lib/portal.functions";
 import { StudentFlow } from "@/components/portal/StudentFlow";
 import { TeacherFlow } from "@/components/portal/TeacherFlow";
