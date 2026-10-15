@@ -7,6 +7,8 @@ import { StudentFlow } from "@/components/portal/StudentFlow";
 import { TeacherFlow } from "@/components/portal/TeacherFlow";
 import { ParentFlow } from "@/components/portal/ParentFlow";
 import { AdminArea } from "@/components/portal/AdminArea";
+import { GlassIcon } from "@/components/portal/GlassIcon";
+import { GraduationCap, Presentation, Users, ShieldCheck, type LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,19 +25,20 @@ export const Route = createFileRoute("/")({
 });
 
 type Tab = "student" | "teacher" | "parent" | "admin";
-const TABS: { id: Tab; icon: string; label: string; hint: string }[] = [
-  { id: "student", icon: "🎓", label: "Students", hint: "Grade 9–12" },
-  { id: "teacher", icon: "👨‍🏫", label: "Teachers", hint: "Staff roster" },
-  { id: "parent", icon: "👪", label: "Parents", hint: "Request access" },
-  { id: "admin", icon: "🔐", label: "Admin", hint: "Dashboard" },
+const TABS: { id: Tab; icon: LucideIcon; label: string; hint: string }[] = [
+  { id: "student", icon: GraduationCap, label: "Students", hint: "Grade 9–12" },
+  { id: "teacher", icon: Presentation, label: "Teachers", hint: "Staff roster" },
+  { id: "parent", icon: Users, label: "Parents", hint: "Request access" },
+  { id: "admin", icon: ShieldCheck, label: "Admin", hint: "Dashboard" },
 ];
 
 function Index() {
   const [tab, setTab] = useState<Tab | null>(null);
   const [support, setSupport] = useState("@Spaceanduniverse13");
+  const [sections, setSections] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
-    getPublicSettings().then((s) => setSupport(s.support_handle)).catch(() => {});
+    getPublicSettings().then((s) => { setSupport(s.support_handle); setSections(s.sections); }).catch(() => {});
   }, []);
 
   const supportUrl = `https://t.me/${support.replace(/^@/, "")}`;
@@ -63,7 +66,7 @@ function Index() {
             onClick={() => setTab(t.id)}
             className={`glass rounded-2xl p-4 text-left transition hover:-translate-y-0.5 ${tab === t.id ? "glow" : ""}`}
           >
-            <div className="text-2xl">{t.icon}</div>
+            <GlassIcon icon={t.icon} />
             <div className="mt-2 font-display font-bold">{t.label}</div>
             <div className="text-xs text-muted-foreground">{t.hint}</div>
           </button>
@@ -76,9 +79,9 @@ function Index() {
             Choose who you are above to begin verification.
           </div>
         )}
-        {tab === "student" && <StudentFlow key="s" supportUrl={supportUrl} support={support} />}
+        {tab === "student" && <StudentFlow key="s" sections={sections} supportUrl={supportUrl} support={support} />}
         {tab === "teacher" && <TeacherFlow key="t" supportUrl={supportUrl} support={support} />}
-        {tab === "parent" && <ParentFlow key="p" />}
+        {tab === "parent" && <ParentFlow key="p" supportUrl={supportUrl} support={support} />}
         {tab === "admin" && <AdminArea key="a" onClose={() => setTab(null)} />}
       </main>
 

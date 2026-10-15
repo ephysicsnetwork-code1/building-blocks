@@ -1,3 +1,5 @@
+import { ShieldX } from "lucide-react";
+import { GlassIcon } from "./GlassIcon";
 import { useEffect, useState } from "react";
 
 /** Protected link reveal: no selection, no context menu, blocked shortcuts, watermark, blur on background. */
@@ -87,7 +89,7 @@ export function SecureReveal({ link, name, handle }: { link: string; name: strin
 export function ErrorCard({ title, text, supportUrl, support }: { title: string; text: string; supportUrl: string; support: string }) {
   return (
     <div className="glass rounded-2xl p-8 text-center">
-      <div className="text-4xl">⛔</div>
+      <GlassIcon icon={ShieldX} size="lg" />
       <h2 className="mt-3 text-xl font-bold">{title}</h2>
       <p className="mt-2 text-sm text-muted-foreground">{text}</p>
       <a href={supportUrl} target="_blank" rel="noreferrer" className="btn-glow mt-6">
