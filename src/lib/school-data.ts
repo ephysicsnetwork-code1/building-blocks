@@ -1,3 +1,5 @@
+import { normalizeName } from "./school-constants";
+export { GRADES, STREAM_GRADES, normalizeName, HANDLE_RE, normalizeHandle } from "./school-constants";
 // Embedded official roster for Burka Harbu Special Secondary School.
 export const SCHOOL_DATABASE = {
   teachers: [
@@ -158,16 +160,12 @@ export const SCHOOL_DATABASE = {
   } as Record<string, Record<string, string[]>>,
 };
 
-export const GRADES = ["9", "10", "11", "12"] as const;
-export const STREAM_GRADES = ["11", "12"];
 
-export function normalizeName(s: string) {
-  return s.toLowerCase().replace(/['’`]/g, "").replace(/\s+/g, " ").trim();
-}
 
 export function findStudent(grade: string, section: string, name: string) {
   const list = SCHOOL_DATABASE.students[grade]?.[section];
-  return list?.find((n) => n === name) ?? null;
+  const n = normalizeName(name);
+  return list?.find((x) => normalizeName(x) === n) ?? null;
 }
 
 export function findTeacher(input: string) {
@@ -183,8 +181,14 @@ export function allStudents() {
   return out;
 }
 
-export const HANDLE_RE = /^@?[A-Za-z0-9_]{5,32}$/;
-export function normalizeHandle(h: string) {
-  const t = h.trim();
-  return t.startsWith("@") ? t : `@${t}`;
+
+export function findStudentAnywhere(name: string) {
+  const n = normalizeName(name);
+  return allStudents().find((s) => normalizeName(s.name) === n) ?? null;
+}
+
+export function sectionsByGrade() {
+  const out: Record<string, string[]> = {};
+  for (const [g, secs] of Object.entries(SCHOOL_DATABASE.students)) out[g] = Object.keys(secs);
+  return out;
 }
