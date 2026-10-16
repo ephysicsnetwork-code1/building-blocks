@@ -172,7 +172,16 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 <td className="p-2 whitespace-nowrap">
                   {p.status === "pending" && (
                     <>
-                      <button className="text-success" onClick={() => run(() => decide({ data: { token, id: p.id, status: "approved" } }), "Approved")}>Approve</button>
+                      <button className="text-success" onClick={async () => {
+                        try {
+                          const r = await decide({ data: { token, id: p.id, status: "approved" } });
+                          if (r.messaged) toast.success("Approved — Telegram approval message sent");
+                          else toast.warning(`Approved, but no Telegram message was sent. ${r.messageError ?? "Check the parent's Telegram handle."}`);
+                          await load();
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Approval failed");
+                        }
+                      }}>Approve</button>
                       <button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</button>
                     </>
                   )}

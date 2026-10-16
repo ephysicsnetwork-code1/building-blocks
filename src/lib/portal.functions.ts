@@ -258,14 +258,21 @@ export const adminDecideParent = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error("Update failed");
     let messaged = false;
+    let messageError: string | null = null;
     if (data.status === "approved") {
       const { data: req } = await db.from("parent_requests").select("telegram_handle,parent_name").eq("id", data.id).maybeSingle();
       if (req) {
         const s = await getSettings();
-        messaged = await messageByHandle(req.telegram_handle, `Hello ${req.parent_name}, your Burka Harbu parent request was approved ✅\n\nJoin the group here: ${s.telegram_link}`).catch(() => false);
+        try {
+          messaged = await messageByHandle(req.telegram_handle, `Hello ${req.parent_name}, your Burka Harbu parent request was approved ✅\n\nJoin the group here: ${s.telegram_link}`);
+          if (!messaged) messageError = "This parent must start the bot once using the same Telegram account before it can message them.";
+        } catch (e) {
+          messageError = e instanceof Error ? e.message : "Telegram could not deliver the approval message.";
+          console.error("Parent approval message failed", messageError);
+        }
       }
     }
-    return { ok: true, messaged };
+    return { ok: true, messaged, messageError };
   });
 
 export const adminDeleteParent = createServerFn({ method: "POST" })

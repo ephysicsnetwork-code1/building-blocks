@@ -141,8 +141,10 @@ export async function addToRoster(kind: "student" | "teacher", e: { name: string
 /** Sends a direct bot message to someone who has pressed /start, matched by Telegram username. */
 export async function messageByHandle(handle: string, text: string) {
   const db = await getDb();
-  const { data } = await db.from("telegram_users").select("chat_id").ilike("username", handle.replace(/^@/, "")).maybeSingle();
+  const { data, error } = await db.from("telegram_users").select("chat_id").ilike("username", handle.replace(/^@/, "")).limit(1).maybeSingle();
+  if (error) throw new Error("Could not look up the parent's Telegram chat.");
   if (!data) return false;
   const r = await telegramCall("sendMessage", { chat_id: data.chat_id, text });
-  return r.ok;
+  if (!r.ok) throw new Error(r.description ?? "Telegram could not deliver the message.");
+  return true;
 }
