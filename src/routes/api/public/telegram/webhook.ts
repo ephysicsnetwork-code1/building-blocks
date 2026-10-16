@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
 
-const PORTAL_URL = "https://bhsss-verification.vercel.app/";
+const PORTAL_URL = "https://bhsss-verifications.vercel.app/";
+const PORTAL_BUTTON = {
+  inline_keyboard: [[{ text: "Open verification portal", url: PORTAL_URL }]],
+};
 
 function expectedSecret(token: string) {
   return createHash("sha256").update(`tg-webhook:${token}`).digest("base64url");
@@ -29,14 +32,19 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
 
         const text: string = (msg.text ?? "").trim();
         if (!text.startsWith("/start")) {
-          await telegramCall("sendMessage", { chat_id: chatId, text: `Please verify on the official portal: ${PORTAL_URL}` });
+          await telegramCall("sendMessage", {
+            chat_id: chatId,
+            text: "Please verify on the official portal.",
+            reply_markup: PORTAL_BUTTON,
+          });
           return Response.json({ ok: true });
         }
 
         const name = msg.from?.first_name ?? "there";
         await telegramCall("sendMessage", {
           chat_id: chatId,
-          text: `👋 Welcome ${name}, to the official Burka Harbu Special Secondary School bot.\n\nStudents, teachers and parents can verify here:\n${PORTAL_URL}`,
+          text: `👋 Welcome ${name}, to the official Burka Harbu Special Secondary School bot.\n\nStudents, teachers and parents can verify using the button below.`,
+          reply_markup: PORTAL_BUTTON,
         });
 
         if (username) {
