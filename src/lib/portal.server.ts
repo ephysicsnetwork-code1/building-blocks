@@ -101,3 +101,48 @@ export async function clearFailures(name: string) {
   const db = await getDb();
   await db.from("verification_attempts").delete().eq("subject", normalizeName(name));
 }
+
+// ---------- Editable roster: embedded list + admin additions − admin removals ----------
+export type RosterStudent = { name: string; grade: string; section: string; stream?: string | null; id?: string };
+export type RosterTeacher = { name: string; id?: string };
+
+export async function loadRoster() {
+  const { SCHOOL_DATABASE, allStudents } = await import("./school-data");
+  const db = await getDb();
+  const [{ data: added }, { data: removed }] = await Promise.all([
+    db.from("roster_entries").select("*").order("created_at"),
+    db.from("roster_removals").select("kind,name_norm"),
+  ]);
+  const gone = new Set((removed ?? []).map((r) => `${r.kind}:${r.name_norm}`));
+  const students: RosterStudent[] = allStudents().filter((s) => !gone.has(`student:${normalizeName(s.name)}`));
+  const teachers: RosterTeacher[] = SCHOOL_DATABASE.teachers
+    .filter((t) => !gone.has(`teacher:${normalizeName(t)}`))
+    .map((name) => ({ name }));
+  for (const r of added ?? []) {
+    if (r.kind === "student") students.push({ id: r.id, name: r.name, grade: r.grade ?? "", section: r.section ?? "", stream: r.stream });
+    else teachers.push({ id: r.id, name: r.name });
+  }
+  return { students, teachers };
+}
+
+export async function removeFromRoster(kind: "student" | "teacher", name: string) {
+  const db = await getDb();
+  await db.from("roster_entries").delete().eq("kind", kind).eq("name", name);
+  await db.from("roster_removals").upsert({ kind, name_norm: normalizeName(name) });
+}
+
+export async function addToRoster(kind: "student" | "teacher", e: { name: string; grade?: string | undefined; section?: string | undefined; stream?: string | null | undefined }) {
+  const db = await getDb();
+  await db.from("roster_removals").delete().eq("kind", kind).eq("name_norm", normalizeName(e.name));
+  const { error } = await db.from("roster_entries").insert({ kind, name: e.name.trim(), grade: e.grade ?? null, section: e.section ?? null, stream: e.stream ?? null });
+  if (error) throw new Error("Could not add");
+}
+
+/** Sends a direct bot message to someone who has pressed /start, matched by Telegram username. */
+export async function messageByHandle(handle: string, text: string) {
+  const db = await getDb();
+  const { data } = await db.from("telegram_users").select("chat_id").ilike("username", handle.replace(/^@/, "")).maybeSingle();
+  if (!data) return false;
+  const r = await telegramCall("sendMessage", { chat_id: data.chat_id, text });
+  return r.ok;
+}

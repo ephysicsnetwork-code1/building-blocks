@@ -3,8 +3,9 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
+  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson,
 } from "@/lib/portal.functions";
-import { ShieldCheck, X, ShieldAlert } from "lucide-react";
+import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { GlassIcon } from "./GlassIcon";
 
 type Data = Awaited<ReturnType<typeof adminGetData>>;
@@ -31,7 +32,8 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (t
     try {
       const r = await login({ data: { username: u, password: p } });
       if (r.ok) onSuccess(r.token);
-      else toast.error("Invalid username or password");
+      else if (r.blocked) toast.error("Too many wrong attempts. Admin login is blocked and the admin has been alerted.");
+      else toast.error(`Invalid username or password. ${r.remaining} attempt(s) left.`);
     } catch {
       toast.error("Login failed");
     } finally {
@@ -65,6 +67,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const testBot = useServerFn(adminTestBot);
   const unban = useServerFn(adminUnban);
   const resolve = useServerFn(adminResolveAlert);
+  const delParent = useServerFn(adminDeleteParent);
+  const addP = useServerFn(adminAddPerson);
+  const editP = useServerFn(adminEditPerson);
+  const removeP = useServerFn(adminRemovePerson);
+  const [editing, setEditing] = useState<null | { kind: "student" | "teacher"; oldName?: string; name: string; grade: string; section: string; stream: string }>(null);
   const [data, setData] = useState<Data | null>(null);
   const [view, setView] = useState<View>("security");
   const [settings, setSettings] = useState({ telegram_link: "", support_handle: "", notify_chat_id: "" });
@@ -169,6 +176,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                       <button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</button>
                     </>
                   )}
+                  <button className="ml-3 text-muted-foreground" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></button>
                 </td>
               </tr>
             ))}
@@ -178,7 +186,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
 
         {view === "students" && (
           <>
-            <input className="field mb-3" placeholder="Search students…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="mb-3 flex gap-2">
+              <input className="field" placeholder="Search students…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <button className="btn-glow flex items-center gap-1 whitespace-nowrap" onClick={() => setEditing({ kind: "student", name: "", grade: "9", section: "A", stream: "" })}><Plus size={16} /> Add</button>
+            </div>
             <Table head={["Name", "Class", "Status", "Handle", ""]}>
               {data.students.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())).map((s) => {
                 const j = joined.get(s.name);
@@ -189,7 +200,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <td className={`p-2 ${j ? "text-success" : "text-muted-foreground"}`}>{j ? "Joined" : "Not joined"}</td>
                     <td className="p-2">{j?.telegram_handle ?? "—"}</td>
                     <td className="p-2">
-                      {j && <button className="text-warning" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}>Reset</button>}
+                      <div className="flex items-center gap-3">
+                        <button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></button>
+                        <button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></button>
+                        {j && <button className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></button>}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -199,18 +214,64 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         )}
 
         {view === "teachers" && (
-          <Table head={["#", "Official name", "Last verified as"]}>
+          <>
+          <div className="mb-3 flex justify-end">
+            <button className="btn-glow flex items-center gap-1" onClick={() => setEditing({ kind: "teacher", name: "", grade: "", section: "", stream: "" })}><Plus size={16} /> Add teacher</button>
+          </div>
+          <Table head={["#", "Official name", "Last verified as", ""]}>
             {data.teachers.map((t, i) => {
-              const a = data.teacherAccess.find((x) => x.full_name === t);
+              const a = data.teacherAccess.find((x) => x.full_name === t.name);
               return (
-                <tr key={t} className="border-t">
+                <tr key={t.name} className="border-t">
                   <td className="p-2 text-muted-foreground">{i + 1}</td>
-                  <td className="p-2">{t}</td>
+                  <td className="p-2">{t.name}</td>
                   <td className="p-2">{a ? `${a.telegram_handle} · ${new Date(a.accessed_at).toLocaleDateString()}` : "—"}</td>
+                  <td className="p-2">
+                    <div className="flex items-center gap-3">
+                      <button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></button>
+                      <button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></button>
+                    </div>
+                  </td>
                 </tr>
               );
             })}
           </Table>
+          </>
+        )}
+
+        {editing && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" role="dialog" aria-modal>
+            <form
+              className="glass glow w-full max-w-sm space-y-3 rounded-2xl p-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const person = {
+                  kind: editing.kind, name: editing.name,
+                  ...(editing.kind === "student" ? { grade: editing.grade as "9", section: editing.section, stream: (editing.stream || null) as "Natural" | null } : {}),
+                };
+                const e2 = editing;
+                run(() => e2.oldName ? editP({ data: { token, oldName: e2.oldName, person } }) : addP({ data: { token, person } }), e2.oldName ? "Saved" : "Added").then(() => setEditing(null));
+              }}
+            >
+              <h3 className="text-lg font-bold">{editing.oldName ? "Edit" : "Add"} {editing.kind}</h3>
+              <input className="field" placeholder="Full name" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+              {editing.kind === "student" && (
+                <div className="grid grid-cols-3 gap-2">
+                  <select className="field" value={editing.grade} onChange={(e) => setEditing({ ...editing, grade: e.target.value })}>
+                    {["9", "10", "11", "12"].map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                  </select>
+                  <input className="field" placeholder="Section" maxLength={2} value={editing.section} onChange={(e) => setEditing({ ...editing, section: e.target.value.toUpperCase() })} />
+                  <select className="field" value={editing.stream} onChange={(e) => setEditing({ ...editing, stream: e.target.value })}>
+                    <option value="">No stream</option><option value="Natural">Natural</option><option value="Social">Social</option>
+                  </select>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button className="btn-glow flex-1" disabled={editing.name.trim().length < 3}>Save</button>
+                <button type="button" className="btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
+              </div>
+            </form>
+          </div>
         )}
 
         {view === "settings" && (

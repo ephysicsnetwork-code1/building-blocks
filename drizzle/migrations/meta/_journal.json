@@ -8,6 +8,13 @@
       "when": 1792086392310,
       "tag": "0000_portal_schema_with_attempts",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792190436088,
+      "tag": "0001_roster_overrides_and_bot_users",
+      "breakpoints": true
     }
   ]
 }

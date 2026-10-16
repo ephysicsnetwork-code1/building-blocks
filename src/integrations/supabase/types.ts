@@ -89,6 +89,54 @@ export type Database = {
         }
         Relationships: []
       }
+      roster_entries: {
+        Row: {
+          created_at: string
+          grade: string | null
+          id: string
+          kind: string
+          name: string
+          section: string | null
+          stream: string | null
+        }
+        Insert: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          kind: string
+          name: string
+          section?: string | null
+          stream?: string | null
+        }
+        Update: {
+          created_at?: string
+          grade?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          section?: string | null
+          stream?: string | null
+        }
+        Relationships: []
+      }
+      roster_removals: {
+        Row: {
+          kind: string
+          name_norm: string
+          removed_at: string
+        }
+        Insert: {
+          kind: string
+          name_norm: string
+          removed_at?: string
+        }
+        Update: {
+          kind?: string
+          name_norm?: string
+          removed_at?: string
+        }
+        Relationships: []
+      }
       student_joins: {
         Row: {
           full_name: string
@@ -134,6 +182,27 @@ export type Database = {
           full_name?: string
           id?: string
           telegram_handle?: string
+        }
+        Relationships: []
+      }
+      telegram_users: {
+        Row: {
+          chat_id: number
+          first_name: string | null
+          first_seen: string
+          username: string | null
+        }
+        Insert: {
+          chat_id: number
+          first_name?: string | null
+          first_seen?: string
+          username?: string | null
+        }
+        Update: {
+          chat_id?: number
+          first_name?: string | null
+          first_seen?: string
+          username?: string | null
         }
         Relationships: []
       }

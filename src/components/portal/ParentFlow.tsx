@@ -40,7 +40,12 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
     setBusy(true);
     try {
       const r = await submit({ data: { parentName, handle, studentName: student } });
-      if (!r.ok) { toast.error("We couldn't find that student. Check the spelling of the full name."); return; }
+      if (!r.ok) {
+        toast.error(r.reason === "handle_is_student"
+          ? "This Telegram username is already registered as a student. Parents must use their own account."
+          : "We couldn't find that student. Check the spelling of the full name.");
+        return;
+      }
       localStorage.setItem(KEY, normalizeHandle(handle));
       if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
       else setPhase("pending");
