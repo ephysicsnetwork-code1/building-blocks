@@ -131,7 +131,7 @@ export async function removeFromRoster(kind: "student" | "teacher", name: string
   await db.from("roster_removals").upsert({ kind, name_norm: normalizeName(name) });
 }
 
-export async function addToRoster(kind: "student" | "teacher", e: { name: string; grade?: string; section?: string; stream?: string | null }) {
+export async function addToRoster(kind: "student" | "teacher", e: { name: string; grade?: string | undefined; section?: string | undefined; stream?: string | null | undefined }) {
   const db = await getDb();
   await db.from("roster_removals").delete().eq("kind", kind).eq("name_norm", normalizeName(e.name));
   const { error } = await db.from("roster_entries").insert({ kind, name: e.name.trim(), grade: e.grade ?? null, section: e.section ?? null, stream: e.stream ?? null });
