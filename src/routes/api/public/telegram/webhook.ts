@@ -3,7 +3,7 @@ import { createHash, timingSafeEqual } from "crypto";
 
 const PORTAL_URL = "https://bhsss-verifications.vercel.app/";
 const PORTAL_BUTTON = {
-  inline_keyboard: [[{ text: "Open verification portal", url: PORTAL_URL }]],
+  inline_keyboard: [[{ text: "Join", web_app: { url: PORTAL_URL } }]],
 };
 
 function expectedSecret(token: string) {
