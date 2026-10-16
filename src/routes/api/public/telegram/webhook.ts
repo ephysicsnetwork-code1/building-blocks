@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
 
-const PORTAL_URL = "https://demobh.vercel.app/";
+const PORTAL_URL = "https://bhsss-verification.vercel.app/";
 
 function expectedSecret(token: string) {
   return createHash("sha256").update(`tg-webhook:${token}`).digest("base64url");
