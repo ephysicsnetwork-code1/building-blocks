@@ -7,11 +7,10 @@ import { submitParentRequest, getParentStatus } from "@/lib/portal.functions";
 import { GlassIcon } from "./GlassIcon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { getTelegramInitData } from "@/lib/parent-telegram";
+import { getTelegramInitData, PARENT_RETURN_HOURS as RETURN_HOURS } from "@/lib/parent-telegram";
 
 const KEY = "bh_parent_handle";
 const RECEIPT_KEY = "bh_parent_receipt";
-const RETURN_HOURS = 18;
 type Phase = "checking" | "form" | "pending" | "approved" | "error" | "lookup";
 
 export function ParentFlow({ supportUrl, support }: { supportUrl: string; support: string }) {

@@ -1,21 +1,33 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "crypto";
 
-const mocks = vi.hoisted(() => ({ getDb: vi.fn(), verifiedTelegramHandle: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getDb: vi.fn(), verifiedTelegramHandle: vi.fn(), verifyParentReceipt: vi.fn() }));
 vi.mock("@tanstack/react-start", () => ({ createServerFn: () => ({ inputValidator() { return this; }, handler(fn: unknown) { return fn; } }) }));
 vi.mock("@tanstack/react-start/server", () => ({ getRequestHeader: vi.fn() }));
 vi.mock("@/lib/portal.server", async (importOriginal) => ({ ...await importOriginal<object>(), ...mocks }));
 import { getParentStatus } from "@/lib/portal.functions";
-const status = getParentStatus as unknown as (input: { data: { handle?: string; initData?: string } }) => Promise<{ status: string; link: string | null }>;
+const status = getParentStatus as unknown as (input: { data: { handle?: string; initData?: string; receipt?: string } }) => Promise<{ status: string; link: string | null }>;
 
 describe("parent invite access", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    const query = { select: vi.fn().mockReturnThis(), ilike: vi.fn().mockReturnThis(), order: vi.fn().mockResolvedValue({ data: [{ status: "approved" }] }) };
+    const query = { select: vi.fn().mockReturnThis(), ilike: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(), order: vi.fn().mockResolvedValue({ data: [{ status: "approved" }] }) };
     mocks.getDb.mockResolvedValue({ from: () => query });
   });
   it("never reveals an invite to a caller who only types an approved handle", async () => {
     expect((await status({ data: { handle: "@parent123" } })).link).toBeNull();
+  });
+  it("restores approved access using a signed request-scoped receipt even with stale Telegram data", async () => {
+    mocks.verifyParentReceipt.mockReturnValue({ id: "request-123", handle: "@parent123" });
+    mocks.verifiedTelegramHandle.mockImplementation(() => { throw new Error("Expired"); });
+    const eq = vi.fn().mockReturnThis();
+    mocks.getDb.mockResolvedValue({ from: () => ({ select() { return this; }, ilike() { return this; }, eq, order: async () => ({ data: [{ status: "approved" }] }) }) });
+    expect((await status({ data: { receipt: "signed-receipt", initData: "stale" } })).link).toBe("https://t.me/+za9uD7CLuG5mOWM0");
+    expect(eq).toHaveBeenCalledWith("id", "request-123");
+  });
+  it("rejects forged receipts", async () => {
+    mocks.verifyParentReceipt.mockImplementation(() => { throw new Error("Invalid request receipt"); });
+    await expect(status({ data: { receipt: "forged" } })).rejects.toThrow("Invalid request receipt");
   });
   it("reveals the requested invite after checking signed Telegram identity and approval", async () => {
     mocks.verifiedTelegramHandle.mockReturnValue("@parent123");

@@ -1,4 +1,5 @@
 export const PARENT_BOT_URL = "https://t.me/BHSSS_Verification_bot?start=parent_auth";
+export const PARENT_RETURN_HOURS = 18;
 export const PARENT_APPROVAL_TEXT = "🎉 Your parent access request for Burka Harbu Special Secondary School has been APPROVED!\nPlease open the Bot Mini App / Portal to complete verification and view your access link.";
 export const PARENT_PORTAL_BUTTON = {
   inline_keyboard: [[{ text: "📱 Open Portal", web_app: { url: "https://bhsss-verifications.vercel.app/" } }]],
