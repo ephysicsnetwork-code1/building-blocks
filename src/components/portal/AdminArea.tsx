@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
-  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson, adminResetTeacher, adminResetParent,
+  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson,
 } from "@/lib/portal.functions";
 import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { GlassIcon } from "./GlassIcon";
@@ -68,8 +68,6 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const unban = useServerFn(adminUnban);
   const resolve = useServerFn(adminResolveAlert);
   const delParent = useServerFn(adminDeleteParent);
-  const resetT = useServerFn(adminResetTeacher);
-  const resetPar = useServerFn(adminResetParent);
   const addP = useServerFn(adminAddPerson);
   const editP = useServerFn(adminEditPerson);
   const removeP = useServerFn(adminRemovePerson);
@@ -174,20 +172,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 <td className="p-2 whitespace-nowrap">
                   {p.status === "pending" && (
                     <>
-                      <button className="text-success" onClick={async () => {
-                        try {
-                          const r = await decide({ data: { token, id: p.id, status: "approved" } });
-                          if (r.messaged) toast.success("Approved — Telegram approval message sent");
-                          else toast.warning(r.messageError ?? "Approval saved, but no Telegram message was sent. Check the parent's Telegram handle.", { duration: 15000 });
-                          await load();
-                        } catch (e) {
-                          toast.error(e instanceof Error ? e.message : "Approval failed");
-                        }
-                      }}>Approve</button>
+                      <button className="text-success" onClick={() => run(() => decide({ data: { token, id: p.id, status: "approved" } }), "Approved")}>Approve</button>
                       <button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</button>
                     </>
                   )}
-                  {p.status !== "pending" && <button className="ml-3 text-warning" aria-label="Reset" title="Reset to pending" onClick={() => confirm(`Reset ${p.parent_name}'s request to pending?`) && run(() => resetPar({ data: { token, id: p.id } }), "Status reset")}><RotateCcw size={15} /></button>}
                   <button className="ml-3 text-muted-foreground" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></button>
                 </td>
               </tr>
@@ -242,7 +230,6 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <div className="flex items-center gap-3">
                       <button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></button>
                       <button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></button>
-                      {a && <button className="text-warning" title="Reset verification" aria-label="Reset" onClick={() => confirm(`Reset verification for ${t.name}?`) && run(() => resetT({ data: { token, name: t.name } }), "Status reset")}><RotateCcw size={15} /></button>}
                     </div>
                   </td>
                 </tr>

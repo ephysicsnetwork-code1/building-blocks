@@ -15,11 +15,7 @@ import {
   addToRoster,
   removeFromRoster,
   messageByHandle,
-  verifiedTelegramHandle,
-  issueParentReceipt,
-  verifyParentReceipt,
 } from "./portal.server";
-import { PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON, PARENT_DELIVERY_FALLBACK } from "./parent-telegram";
 import { getRequestHeader } from "@tanstack/react-start/server";
 
 async function rosterSections() {
@@ -112,28 +108,19 @@ export const verifyTeacher = createServerFn({ method: "POST" })
   });
 
 export const getParentStatus = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ handle: handle.optional(), initData: z.string().max(10000).optional(), receipt: z.string().max(2000).optional() }).refine((d) => d.handle || d.initData || d.receipt, "Enter your Telegram handle").parse(d))
+  .inputValidator((d) => z.object({ handle }).parse(d))
   .handler(async ({ data }) => {
-    const receipt = data.receipt ? verifyParentReceipt(data.receipt) : null;
-    let verifiedHandle: string | null = null;
-    if (data.initData) {
-      try { verifiedHandle = verifiedTelegramHandle(data.initData); }
-      catch (error) { if (!receipt && !data.handle) throw error; }
-    }
-    const parentHandle = verifiedHandle ?? receipt?.handle ?? data.handle;
-    if (!parentHandle) throw new Error("Open the Telegram bot to verify your account.");
     const db = await getDb();
-    let query = db
+    const { data: rows } = await db
       .from("parent_requests")
       .select("status")
-      .ilike("telegram_handle", parentHandle);
-    if (receipt && !verifiedHandle) query = query.eq("id", receipt.id);
-    const { data: rows, error } = await query.order("created_at", { ascending: false });
-    if (error) throw new Error("Could not check your request. Please try again.");
+      .ilike("telegram_handle", data.handle)
+      .order("created_at", { ascending: false });
     const statuses = (rows ?? []).map((r) => r.status);
     const status = statuses.includes("approved") ? "approved" : statuses.includes("pending") ? "pending" : statuses[0] ?? "none";
-    if (status === "approved" && (verifiedHandle || receipt)) {
-      return { status, link: "https://t.me/+za9uD7CLuG5mOWM0" };
+    if (status === "approved") {
+      const s = await getSettings();
+      return { status, link: s.telegram_link };
     }
     return { status, link: null };
   });
@@ -155,7 +142,8 @@ export const submitParentRequest = createServerFn({ method: "POST" })
       .select("status")
       .ilike("telegram_handle", data.handle);
     if ((existing ?? []).some((r) => r.status === "approved")) {
-      return { ok: true as const, status: "approved" as const, link: null };
+      const s = await getSettings();
+      return { ok: true as const, status: "approved" as const, link: s.telegram_link };
     }
     if ((existing ?? []).some((r) => r.status === "pending"))
       return { ok: true as const, status: "pending" as const, link: null };
@@ -164,14 +152,14 @@ export const submitParentRequest = createServerFn({ method: "POST" })
     const sn = normalizeName(data.studentName);
     const student = (await loadRoster()).students.find((x) => normalizeName(x.name) === sn);
     if (!student) return { ok: false as const, reason: "student_not_found" as const };
-    const { data: request, error } = await db.from("parent_requests").insert({
+    const { error } = await db.from("parent_requests").insert({
       parent_name: data.parentName,
       telegram_handle: data.handle,
       student_name: student.name,
-    }).select("id").single();
-    if (error || !request) throw new Error("Could not submit request");
+    });
+    if (error) throw new Error("Could not submit request");
     void notify(`👪 New parent request: ${data.parentName} ${data.handle} for ${student.name}`);
-    return { ok: true as const, status: "pending" as const, link: null, receipt: issueParentReceipt(request.id, data.handle) };
+    return { ok: true as const, status: "pending" as const, link: null };
   });
 
 export const adminLogin = createServerFn({ method: "POST" })
@@ -270,21 +258,14 @@ export const adminDecideParent = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Error("Update failed");
     let messaged = false;
-    let messageError: string | null = null;
     if (data.status === "approved") {
       const { data: req } = await db.from("parent_requests").select("telegram_handle,parent_name").eq("id", data.id).maybeSingle();
       if (req) {
-        try {
-          messaged = await messageByHandle(req.telegram_handle, PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON);
-          if (!messaged) messageError = PARENT_DELIVERY_FALLBACK;
-        } catch (e) {
-          const detail = e instanceof Error ? e.message : "Telegram could not deliver the approval message.";
-          messageError = /403|blocked|chat not found|initiated|started/i.test(detail) ? PARENT_DELIVERY_FALLBACK : `Approval saved! ${detail}`;
-          console.error("Parent approval message failed", messageError);
-        }
-      } else messageError = "Approval saved, but the parent request could not be read for notification.";
+        const s = await getSettings();
+        messaged = await messageByHandle(req.telegram_handle, `Hello ${req.parent_name}, your Burka Harbu parent request was approved ✅\n\nJoin the group here: ${s.telegram_link}`).catch(() => false);
+      }
     }
-    return { ok: true, messaged, messageError };
+    return { ok: true, messaged };
   });
 
 export const adminDeleteParent = createServerFn({ method: "POST" })
@@ -344,26 +325,6 @@ export const adminResetStudent = createServerFn({ method: "POST" })
     assertAdmin(data.token);
     const db = await getDb();
     const { error } = await db.from("student_joins").delete().eq("full_name", data.name);
-    if (error) throw new Error("Reset failed");
-    return { ok: true };
-  });
-
-export const adminResetTeacher = createServerFn({ method: "POST" })
-  .inputValidator((d) => tokenSchema.extend({ name: z.string().min(2).max(120) }).parse(d))
-  .handler(async ({ data }) => {
-    assertAdmin(data.token);
-    const db = await getDb();
-    const { error } = await db.from("teacher_access").delete().eq("full_name", data.name);
-    if (error) throw new Error("Reset failed");
-    return { ok: true };
-  });
-
-export const adminResetParent = createServerFn({ method: "POST" })
-  .inputValidator((d) => tokenSchema.extend({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
-    assertAdmin(data.token);
-    const db = await getDb();
-    const { error } = await db.from("parent_requests").update({ status: "pending", decided_at: null }).eq("id", data.id);
     if (error) throw new Error("Reset failed");
     return { ok: true };
   });

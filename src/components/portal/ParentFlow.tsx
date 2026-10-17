@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { Hourglass, Send, RefreshCw } from "lucide-react";
+import { Hourglass, Send } from "lucide-react";
 import { HANDLE_RE, normalizeHandle } from "@/lib/school-constants";
 import { submitParentRequest, getParentStatus } from "@/lib/portal.functions";
 import { GlassIcon } from "./GlassIcon";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { getTelegramInitData, waitForTelegramInitData, openParentBot, PARENT_BOT_URL, PARENT_RETURN_HOURS as RETURN_HOURS } from "@/lib/parent-telegram";
 
 const KEY = "bh_parent_handle";
-const RECEIPT_KEY = "bh_parent_receipt";
-type Phase = "checking" | "form" | "pending" | "approved" | "error" | "lookup";
+type Phase = "checking" | "form" | "pending" | "approved";
 
 export function ParentFlow({ supportUrl, support }: { supportUrl: string; support: string }) {
   const submit = useServerFn(submitParentRequest);
@@ -22,38 +18,19 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   const [handle, setHandle] = useState("");
   const [student, setStudent] = useState("");
   const [busy, setBusy] = useState(false);
-  const [showStart, setShowStart] = useState(false);
 
-  async function checkStatus(saved?: string | null) {
-    const stored = saved ?? localStorage.getItem(KEY);
-    const receipt = localStorage.getItem(RECEIPT_KEY);
-    const initData = getTelegramInitData() || (await waitForTelegramInitData());
-    if (!stored && !receipt && !initData) { setPhase("form"); return; }
-    try {
-      const r = await status({ data: { ...(stored ? { handle: stored } : {}), ...(receipt ? { receipt } : {}), ...(initData ? { initData } : {}) } });
-      setLink(r.link);
-      if (r.status === "approved") setPhase("approved");
-      else if (r.status === "pending") setPhase("pending");
-      else setPhase("form");
-    } catch { setPhase("error"); }
-  }
-
+  // On every visit, if this device submitted before, go straight to the right screen.
   useEffect(() => {
-    void checkStatus();
-    const refresh = () => { void checkStatus(); };
-    window.addEventListener("focus", refresh);
-    const timer = window.setInterval(refresh, 30000);
-    return () => { window.removeEventListener("focus", refresh); window.clearInterval(timer); };
+    const saved = localStorage.getItem(KEY);
+    if (!saved) { setPhase("form"); return; }
+    status({ data: { handle: saved } })
+      .then((r) => {
+        if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
+        else if (r.status === "pending") setPhase("pending");
+        else setPhase("form");
+      })
+      .catch(() => setPhase("form"));
   }, [status]);
-
-  async function onLookup(e: React.FormEvent) {
-    e.preventDefault();
-    if (!HANDLE_RE.test(handle.trim())) { toast.error("Enter a valid Telegram handle"); return; }
-    setBusy(true);
-    localStorage.setItem(KEY, normalizeHandle(handle));
-    await checkStatus(normalizeHandle(handle));
-    setBusy(false);
-  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -70,9 +47,8 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
         return;
       }
       localStorage.setItem(KEY, normalizeHandle(handle));
-      if ("receipt" in r && r.receipt) localStorage.setItem(RECEIPT_KEY, r.receipt);
-      if (r.status === "approved") { await checkStatus(normalizeHandle(handle)); }
-      else { setPhase("pending"); setShowStart(true); }
+      if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
+      else setPhase("pending");
     } catch {
       toast.error("Could not submit. Please try again.");
     } finally {
@@ -87,15 +63,12 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
     return (
       <div className="glass glow rounded-2xl p-8 text-center">
         <GlassIcon icon={Send} size="lg" />
-        <h2 className="mt-4 text-xl font-bold">Your request is approved</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Your parent access has been approved by the school admin. You can now join the group.</p>
+        <h2 className="mt-4 text-xl font-bold">Join the group</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Your parent access has been approved by the school admin.</p>
         {link ? (
-          <Button asChild className="mt-6"><a href={link} target="_blank" rel="noreferrer">Join the Telegram group</a></Button>
+          <a href={link} target="_blank" rel="noreferrer" className="btn-glow mt-6">Join the Telegram group</a>
         ) : (
-          <>
-            <p className="mt-3 text-sm text-muted-foreground">Open the portal from our Telegram bot so we can confirm your account and show your group link.</p>
-            <Button asChild className="mt-6"><a href={PARENT_BOT_URL} onClick={(e) => { if (openParentBot()) e.preventDefault(); }}>Open in Telegram bot</a></Button>
-          </>
+          <a href={supportUrl} target="_blank" rel="noreferrer" className="btn-glow mt-6">Contact admin</a>
         )}
       </div>
     );
@@ -105,58 +78,27 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
       <div className="glass rounded-2xl p-8 text-center">
         <GlassIcon icon={Hourglass} size="lg" />
         <h2 className="mt-4 text-xl font-bold">Request under review</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Your request is pending admin approval. Please come back after {RETURN_HOURS} hours to check your status.</p>
-        <Button variant="outline" className="mt-6" onClick={() => { void checkStatus(); }}><RefreshCw />Check status</Button>
-        <Dialog open={showStart} onOpenChange={setShowStart}>
-          <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-lg">
-            <DialogTitle>Request submitted</DialogTitle>
-            <DialogDescription className="space-y-4" asChild>
-              <div>
-                <p>Your request is pending admin approval.</p>
-                <p>Please come back after {RETURN_HOURS} hours to check your status.</p>
-              </div>
-            </DialogDescription>
-            <Button onClick={() => setShowStart(false)}>OK</Button>
-          </DialogContent>
-        </Dialog>
+        <p className="mt-2 text-sm text-muted-foreground">The school admin will review your request. Come back here once approved to join the group.</p>
       </div>
     );
-
-  if (phase === "error") return (
-    <div className="glass rounded-2xl p-8 text-center">
-      <h2 className="text-xl font-bold">Could not check your request</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Your saved request is still here. Please try again.</p>
-      <Button className="mt-6" onClick={() => { void checkStatus(); }}><RefreshCw />Try again</Button>
-    </div>
-  );
-
-  if (phase === "lookup") return (
-    <form onSubmit={onLookup} className="glass space-y-4 rounded-2xl p-5 sm:p-7">
-      <h2 className="text-xl font-bold">Check your request</h2>
-      <label htmlFor="parent-status-handle" className="text-sm font-semibold">Your Telegram handle</label>
-      <input id="parent-status-handle" className="field" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={33} placeholder="@username" />
-      <Button type="submit" className="w-full" disabled={busy}>{busy ? "Checking…" : "Check status"}</Button>
-    </form>
-  );
 
   return (
     <form onSubmit={onSubmit} className="glass space-y-4 rounded-2xl p-5 sm:p-7">
       <h2 className="text-xl font-bold">Parent access request</h2>
       <p className="text-xs text-muted-foreground">Parent requests are approved manually by the admin.</p>
       <div>
-        <label htmlFor="parent-name" className="text-sm font-semibold">Your full name</label>
-        <input id="parent-name" className="field mt-2" value={parentName} onChange={(e) => setParentName(e.target.value)} maxLength={120} />
+        <label className="text-sm font-semibold">Your full name</label>
+        <input className="field mt-2" value={parentName} onChange={(e) => setParentName(e.target.value)} maxLength={120} />
       </div>
       <div>
-        <label htmlFor="parent-handle" className="text-sm font-semibold">Your Telegram handle</label>
-        <input id="parent-handle" className="field mt-2" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={33} placeholder="@username" />
+        <label className="text-sm font-semibold">Your Telegram handle</label>
+        <input className="field mt-2" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={33} placeholder="@username" />
       </div>
       <div>
-        <label htmlFor="parent-student" className="text-sm font-semibold">Your child's full name</label>
-        <input id="parent-student" className="field mt-2" value={student} onChange={(e) => setStudent(e.target.value)} maxLength={120} placeholder="As registered at school" autoComplete="off" />
+        <label className="text-sm font-semibold">Your child's full name</label>
+        <input className="field mt-2" value={student} onChange={(e) => setStudent(e.target.value)} maxLength={120} placeholder="As registered at school" autoComplete="off" />
       </div>
-      <Button type="submit" className="w-full" disabled={busy}>{busy ? "Submitting…" : "Submit request"}</Button>
-      <Button type="button" variant="ghost" className="w-full" onClick={() => setPhase("lookup")}>Already requested? Check status</Button>
+      <button className="btn-glow w-full" disabled={busy}>{busy ? "Submitting…" : "Submit request"}</button>
     </form>
   );
 }
