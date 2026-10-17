@@ -33,7 +33,7 @@ describe("parent approval delivery", () => {
     const result = await decide({ data: { token: "test-token", id: "request-id", status: "approved" } });
     expect(mocks.assertAdmin).toHaveBeenCalledWith("test-token");
     expect(mocks.messageByHandle).toHaveBeenCalledWith("@parent123", expect.stringContaining("APPROVED!"), {
-      inline_keyboard: [[{ text: "📱 Open Portal", web_app: { url: "https://demobh.vercel.app/" } }]],
+      inline_keyboard: [[{ text: "📱 Open Portal", web_app: { url: "https://bhsss-verifications.vercel.app/" } }]],
     });
     expect(mocks.messageByHandle.mock.calls[0]?.[1]).not.toContain("https://t.me/");
     expect(result.messaged).toBe(true);
