@@ -1,0 +1,3 @@
+- [ ] Add submission popup and bot start action.
+- [ ] Send button-only approval notices, including webhook replies, and show delivery fallback.
+- [ ] Verify approved parent access securely inside the portal and test the flow.
