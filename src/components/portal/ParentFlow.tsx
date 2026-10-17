@@ -7,7 +7,7 @@ import { submitParentRequest, getParentStatus } from "@/lib/portal.functions";
 import { GlassIcon } from "./GlassIcon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { getTelegramInitData, PARENT_RETURN_HOURS as RETURN_HOURS } from "@/lib/parent-telegram";
+import { getTelegramInitData, waitForTelegramInitData, openParentBot, PARENT_BOT_URL, PARENT_RETURN_HOURS as RETURN_HOURS } from "@/lib/parent-telegram";
 
 const KEY = "bh_parent_handle";
 const RECEIPT_KEY = "bh_parent_receipt";
@@ -27,7 +27,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   async function checkStatus(saved?: string | null) {
     const stored = saved ?? localStorage.getItem(KEY);
     const receipt = localStorage.getItem(RECEIPT_KEY);
-    const initData = getTelegramInitData();
+    const initData = getTelegramInitData() || (await waitForTelegramInitData());
     if (!stored && !receipt && !initData) { setPhase("form"); return; }
     try {
       const r = await status({ data: { ...(stored ? { handle: stored } : {}), ...(receipt ? { receipt } : {}), ...(initData ? { initData } : {}) } });
@@ -93,8 +93,8 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
           <Button asChild className="mt-6"><a href={link} target="_blank" rel="noreferrer">Join the Telegram group</a></Button>
         ) : (
           <>
-            <p className="mt-3 text-sm text-muted-foreground">Open the portal from @BHSSS_Verification_bot to verify your Telegram account and view your access link.</p>
-
+            <p className="mt-3 text-sm text-muted-foreground">Open the portal from our Telegram bot so we can confirm your account and show your group link.</p>
+            <Button asChild className="mt-6"><a href={PARENT_BOT_URL} onClick={(e) => { if (openParentBot()) e.preventDefault(); }}>Open in Telegram bot</a></Button>
           </>
         )}
       </div>

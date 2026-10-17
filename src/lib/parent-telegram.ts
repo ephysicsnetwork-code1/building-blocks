@@ -23,3 +23,16 @@ export function getTelegramInitData() {
   if (typeof window === "undefined") return "";
   return (window as Window & { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData ?? "";
 }
+
+/** The Telegram script can load after the page; wait briefly so returning parents are recognised by their bot account. */
+export async function waitForTelegramInitData(timeoutMs = 3000) {
+  if (typeof window === "undefined") return "";
+  const inTelegram = /tgWebApp/i.test(window.location.hash + window.location.search) || !!(window as any).TelegramWebviewProxy;
+  const deadline = Date.now() + (inTelegram ? timeoutMs : 300);
+  while (Date.now() < deadline) {
+    const d = getTelegramInitData();
+    if (d) { try { (window as any).Telegram?.WebApp?.ready?.(); } catch { /* ignore */ } return d; }
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return getTelegramInitData();
+}
