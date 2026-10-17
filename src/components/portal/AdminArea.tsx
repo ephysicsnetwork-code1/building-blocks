@@ -239,6 +239,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <div className="flex items-center gap-3">
                       <button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></button>
                       <button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></button>
+                      {a && <button className="text-warning" title="Reset verification" aria-label="Reset" onClick={() => confirm(`Reset verification for ${t.name}?`) && run(() => resetT({ data: { token, name: t.name } }), "Status reset")}><RotateCcw size={15} /></button>}
                     </div>
                   </td>
                 </tr>

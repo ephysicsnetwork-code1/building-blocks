@@ -336,6 +336,26 @@ export const adminResetStudent = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminResetTeacher = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ name: z.string().min(2).max(120) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { error } = await db.from("teacher_access").delete().eq("full_name", data.name);
+    if (error) throw new Error("Reset failed");
+    return { ok: true };
+  });
+
+export const adminResetParent = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { error } = await db.from("parent_requests").update({ status: "pending", decided_at: null }).eq("id", data.id);
+    if (error) throw new Error("Reset failed");
+    return { ok: true };
+  });
+
 export const adminTestBot = createServerFn({ method: "POST" })
   .inputValidator((d) => tokenSchema.parse(d))
   .handler(async ({ data }) => {
