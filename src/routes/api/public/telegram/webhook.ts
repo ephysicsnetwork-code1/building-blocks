@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
+import { PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON } from "@/lib/parent-telegram";
 
-const PORTAL_URL = "https://bhsss-verifications.vercel.app/";
+const PORTAL_URL = "https://demobh.vercel.app/";
 const PORTAL_BUTTON = {
   inline_keyboard: [[{ text: "Open verification portal", web_app: { url: PORTAL_URL } }]],
 };
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
         const msg = update?.message;
         if (!msg?.chat?.id || msg.chat.type !== "private") return Response.json({ ok: true });
 
-        const { getDb, getSettings, telegramCall } = await import("@/lib/portal.server");
+        const { getDb, telegramCall } = await import("@/lib/portal.server");
         const db = await getDb();
         const chatId = msg.chat.id as number;
         const username: string | null = msg.from?.username ?? null;
@@ -54,8 +55,7 @@ export const Route = createFileRoute("/api/public/telegram/webhook")({
             db.from("student_joins").select("full_name").ilike("telegram_handle", h).limit(1),
           ]);
           if (parent && parent.length > 0) {
-            const s = await getSettings();
-            await telegramCall("sendMessage", { chat_id: chatId, text: `✅ Your parent request is approved.\n\nJoin the private group: ${s.telegram_link}` });
+            await telegramCall("sendMessage", { chat_id: chatId, text: PARENT_APPROVAL_TEXT, reply_markup: PARENT_PORTAL_BUTTON });
           } else if (student && student.length > 0) {
             await telegramCall("sendMessage", { chat_id: chatId, text: "You have successfully joined the Burka Harbu student network!" });
           }

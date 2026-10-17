@@ -178,7 +178,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                         try {
                           const r = await decide({ data: { token, id: p.id, status: "approved" } });
                           if (r.messaged) toast.success("Approved — Telegram approval message sent");
-                          else toast.warning(`Approved, but no Telegram message was sent. ${r.messageError ?? "Check the parent's Telegram handle."}`);
+                          else toast.warning(r.messageError ?? "Approval saved, but no Telegram message was sent. Check the parent's Telegram handle.", { duration: 15000 });
                           await load();
                         } catch (e) {
                           toast.error(e instanceof Error ? e.message : "Approval failed");
