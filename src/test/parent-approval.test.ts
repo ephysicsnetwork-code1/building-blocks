@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  assertAdmin: vi.fn(), getDb: vi.fn(), getSettings: vi.fn(), messageByHandle: vi.fn(),
+  assertAdmin: vi.fn(), getDb: vi.fn(), getSettings: vi.fn(), messageByHandle: vi.fn(), verifiedTelegramHandle: vi.fn(),
 }));
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({ inputValidator() { return this; }, handler(fn: unknown) { return fn; } }),
@@ -32,14 +32,23 @@ describe("parent approval delivery", () => {
     mocks.messageByHandle.mockResolvedValue(true);
     const result = await decide({ data: { token: "test-token", id: "request-id", status: "approved" } });
     expect(mocks.assertAdmin).toHaveBeenCalledWith("test-token");
-    expect(mocks.messageByHandle).toHaveBeenCalledWith("@parent123", expect.stringContaining("https://t.me/+test-invite"));
+    expect(mocks.messageByHandle).toHaveBeenCalledWith("@parent123", expect.stringContaining("APPROVED!"), {
+      inline_keyboard: [[{ text: "📱 Open Portal", web_app: { url: "https://demobh.vercel.app/" } }]],
+    });
+    expect(mocks.messageByHandle.mock.calls[0]?.[1]).not.toContain("https://t.me/");
     expect(result.messaged).toBe(true);
   });
   it("reports when Telegram cannot deliver rather than claiming it sent", async () => {
     mocks.messageByHandle.mockResolvedValue(false);
     const result = await decide({ data: { token: "test-token", id: "request-id", status: "approved" } });
     expect(result.messaged).toBe(false);
-    expect(result.messageError).toBeTruthy();
+    expect(result.messageError).toBe("Approval saved! Please remind the parent to open @BHSSS_Verification_bot and tap /start to receive their approval notification.");
+  });
+  it("keeps approval saved and supplies the reminder when the bot is blocked", async () => {
+    mocks.messageByHandle.mockRejectedValue(new Error("Telegram [403]: Forbidden: bot was blocked by user"));
+    const result = await decide({ data: { token: "test-token", id: "request-id", status: "approved" } });
+    expect(result.messaged).toBe(false);
+    expect(result.messageError).toContain("Approval saved! Please remind the parent to open @BHSSS_Verification_bot");
   });
   it("does not send an approval message for rejected requests", async () => {
     await decide({ data: { token: "test-token", id: "request-id", status: "rejected" } });
