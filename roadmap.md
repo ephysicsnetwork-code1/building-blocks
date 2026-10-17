@@ -3,5 +3,5 @@
 - [x] Validate approved parent access with signed Telegram identity; tests and real submission/approval/fallback flow passed.
 - [x] Update Telegram portal buttons to https://bhsss-verifications.vercel.app/.
 - [x] Repair parent bot-start buttons inside Telegram with normal-browser fallback.
-- [ ] Repair and verify the bot webhook registration on the published portal.
+- [x] Repair and verify the bot webhook registration on the published portal; signed requests return 200 and Telegram confirms registration.
 - [ ] Confirm live parent approval delivery after publishing and redeploying bhsss-verifications.vercel.app; requires a parent to press Start and receive a real approval notification.
