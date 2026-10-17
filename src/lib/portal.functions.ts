@@ -15,7 +15,9 @@ import {
   addToRoster,
   removeFromRoster,
   messageByHandle,
+  verifiedTelegramHandle,
 } from "./portal.server";
+import { PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON, PARENT_DELIVERY_FALLBACK } from "./parent-telegram";
 import { getRequestHeader } from "@tanstack/react-start/server";
 
 async function rosterSections() {
@@ -108,19 +110,21 @@ export const verifyTeacher = createServerFn({ method: "POST" })
   });
 
 export const getParentStatus = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ handle }).parse(d))
+  .inputValidator((d) => z.object({ handle: handle.optional(), initData: z.string().max(10000).optional() }).refine((d) => d.handle || d.initData, "Open the bot or enter your handle").parse(d))
   .handler(async ({ data }) => {
+    const verifiedHandle = data.initData ? verifiedTelegramHandle(data.initData) : null;
+    const parentHandle = verifiedHandle ?? data.handle;
+    if (!parentHandle) throw new Error("Open the Telegram bot to verify your account.");
     const db = await getDb();
     const { data: rows } = await db
       .from("parent_requests")
       .select("status")
-      .ilike("telegram_handle", data.handle)
+      .ilike("telegram_handle", parentHandle)
       .order("created_at", { ascending: false });
     const statuses = (rows ?? []).map((r) => r.status);
     const status = statuses.includes("approved") ? "approved" : statuses.includes("pending") ? "pending" : statuses[0] ?? "none";
-    if (status === "approved") {
-      const s = await getSettings();
-      return { status, link: s.telegram_link };
+    if (status === "approved" && verifiedHandle) {
+      return { status, link: "https://t.me/+za9uD7CLuG5mOWM0" };
     }
     return { status, link: null };
   });
@@ -142,8 +146,7 @@ export const submitParentRequest = createServerFn({ method: "POST" })
       .select("status")
       .ilike("telegram_handle", data.handle);
     if ((existing ?? []).some((r) => r.status === "approved")) {
-      const s = await getSettings();
-      return { ok: true as const, status: "approved" as const, link: s.telegram_link };
+      return { ok: true as const, status: "approved" as const, link: null };
     }
     if ((existing ?? []).some((r) => r.status === "pending"))
       return { ok: true as const, status: "pending" as const, link: null };
@@ -262,15 +265,15 @@ export const adminDecideParent = createServerFn({ method: "POST" })
     if (data.status === "approved") {
       const { data: req } = await db.from("parent_requests").select("telegram_handle,parent_name").eq("id", data.id).maybeSingle();
       if (req) {
-        const s = await getSettings();
         try {
-          messaged = await messageByHandle(req.telegram_handle, `Hello ${req.parent_name}, your Burka Harbu parent request was approved ✅\n\nJoin the group here: ${s.telegram_link}`);
-          if (!messaged) messageError = "This parent must start the bot once using the same Telegram account before it can message them.";
+          messaged = await messageByHandle(req.telegram_handle, PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON);
+          if (!messaged) messageError = PARENT_DELIVERY_FALLBACK;
         } catch (e) {
-          messageError = e instanceof Error ? e.message : "Telegram could not deliver the approval message.";
+          const detail = e instanceof Error ? e.message : "Telegram could not deliver the approval message.";
+          messageError = /403|blocked|chat not found|initiated|started/i.test(detail) ? PARENT_DELIVERY_FALLBACK : `Approval saved! ${detail}`;
           console.error("Parent approval message failed", messageError);
         }
-      }
+      } else messageError = "Approval saved, but the parent request could not be read for notification.";
     }
     return { ok: true, messaged, messageError };
   });

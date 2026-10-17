@@ -5,6 +5,9 @@ import { Hourglass, Send } from "lucide-react";
 import { HANDLE_RE, normalizeHandle } from "@/lib/school-constants";
 import { submitParentRequest, getParentStatus } from "@/lib/portal.functions";
 import { GlassIcon } from "./GlassIcon";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PARENT_BOT_URL, getTelegramInitData } from "@/lib/parent-telegram";
 
 const KEY = "bh_parent_handle";
 type Phase = "checking" | "form" | "pending" | "approved";
@@ -18,12 +21,14 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   const [handle, setHandle] = useState("");
   const [student, setStudent] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showStart, setShowStart] = useState(false);
 
   // On every visit, if this device submitted before, go straight to the right screen.
   useEffect(() => {
     const saved = localStorage.getItem(KEY);
-    if (!saved) { setPhase("form"); return; }
-    status({ data: { handle: saved } })
+    const initData = getTelegramInitData();
+    if (!saved && !initData) { setPhase("form"); return; }
+    status({ data: { ...(saved ? { handle: saved } : {}), ...(initData ? { initData } : {}) } })
       .then((r) => {
         if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
         else if (r.status === "pending") setPhase("pending");
@@ -48,7 +53,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
       }
       localStorage.setItem(KEY, normalizeHandle(handle));
       if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
-      else setPhase("pending");
+      else { setPhase("pending"); setShowStart(true); }
     } catch {
       toast.error("Could not submit. Please try again.");
     } finally {
@@ -68,7 +73,10 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
         {link ? (
           <a href={link} target="_blank" rel="noreferrer" className="btn-glow mt-6">Join the Telegram group</a>
         ) : (
-          <a href={supportUrl} target="_blank" rel="noreferrer" className="btn-glow mt-6">Contact admin</a>
+          <>
+            <p className="mt-3 text-sm text-muted-foreground">Open the portal from @BHSSS_Verification_bot to verify your Telegram account and view your access link.</p>
+            <Button asChild className="mt-6"><a href={PARENT_BOT_URL} target="_blank" rel="noreferrer">🚀 Tap Here to Start Bot</a></Button>
+          </>
         )}
       </div>
     );
@@ -78,7 +86,20 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
       <div className="glass rounded-2xl p-8 text-center">
         <GlassIcon icon={Hourglass} size="lg" />
         <h2 className="mt-4 text-xl font-bold">Request under review</h2>
-        <p className="mt-2 text-sm text-muted-foreground">The school admin will review your request. Come back here once approved to join the group.</p>
+        <p className="mt-2 text-sm text-muted-foreground">The school admin will review your request. Start @BHSSS_Verification_bot now to receive your approval notification.</p>
+        <Button asChild className="mt-6"><a href={PARENT_BOT_URL} target="_blank" rel="noreferrer">🚀 Tap Here to Start Bot</a></Button>
+        <Dialog open={showStart} onOpenChange={setShowStart}>
+          <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-lg">
+            <DialogTitle>Request submitted</DialogTitle>
+            <DialogDescription className="space-y-4" asChild>
+              <div>
+                <p>Step 1: Your request is pending admin approval.</p>
+                <p>Step 2: You MUST open our Telegram Bot (@BHSSS_Verification_bot) and tap /start right now so the bot can notify you when your status is updated!</p>
+              </div>
+            </DialogDescription>
+            <Button asChild className="h-auto min-h-10 whitespace-normal text-center"><a href={PARENT_BOT_URL} target="_blank" rel="noreferrer">🚀 Tap Here to Start Bot</a></Button>
+          </DialogContent>
+        </Dialog>
       </div>
     );
 

@@ -12,6 +12,7 @@ import { GraduationCap, Presentation, Users, ShieldCheck, type LucideIcon } from
 
 export const Route = createFileRoute("/")({
   head: () => ({
+    scripts: [{ src: "https://telegram.org/js/telegram-web-app.js" }],
     meta: [
       { title: "Burka Harbu Verification Portal" },
       { name: "description", content: "Verify as a student, teacher or parent of Burka Harbu Special Secondary School to join the official Telegram group." },

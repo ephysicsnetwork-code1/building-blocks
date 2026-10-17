@@ -61,7 +61,28 @@ export async function telegramCall(method: string, body: Record<string, unknown>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return (await res.json()) as { ok: boolean; result?: any; description?: string };
+  const result = (await res.json()) as { ok: boolean; result?: any; description?: string; error_code?: number };
+  if (!res.ok || !result.ok) {
+    throw new Error(`Telegram [${result.error_code ?? res.status}]: ${result.description ?? "Request failed"}`);
+  }
+  return result;
+}
+
+/** Only Telegram-signed, recent mini-app data may unlock a parent's private invite. */
+export function verifiedTelegramHandle(initData: string) {
+  const token = process.env["TELEGRAM_BOT_TOKEN"];
+  if (!token) throw new Error("Telegram bot is not configured");
+  const params = new URLSearchParams(initData);
+  const hash = params.get("hash") ?? "";
+  params.delete("hash");
+  const check = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join("\n");
+  const secret = createHmac("sha256", "WebAppData").update(token).digest();
+  const expected = createHmac("sha256", secret).update(check).digest("hex");
+  const age = Date.now() / 1000 - Number(params.get("auth_date"));
+  if (!safeEqual(hash, expected) || !Number.isFinite(age) || age < -60 || age > 3600) throw new Error("Please reopen the portal from the Telegram bot.");
+  const user = JSON.parse(params.get("user") ?? "null");
+  if (typeof user?.username !== "string" || !/^[a-zA-Z0-9_]{5,32}$/.test(user.username)) throw new Error("Set a Telegram username before opening the portal.");
+  return `@${user.username.toLowerCase()}`;
 }
 
 
@@ -139,12 +160,12 @@ export async function addToRoster(kind: "student" | "teacher", e: { name: string
 }
 
 /** Sends a direct bot message to someone who has pressed /start, matched by Telegram username. */
-export async function messageByHandle(handle: string, text: string) {
+export async function messageByHandle(handle: string, text: string, replyMarkup?: Record<string, unknown>) {
   const db = await getDb();
   const { data, error } = await db.from("telegram_users").select("chat_id").ilike("username", handle.replace(/^@/, "")).limit(1).maybeSingle();
   if (error) throw new Error("Could not look up the parent's Telegram chat.");
   if (!data) return false;
-  const r = await telegramCall("sendMessage", { chat_id: data.chat_id, text });
+  const r = await telegramCall("sendMessage", { chat_id: data.chat_id, text, ...(replyMarkup ? { reply_markup: replyMarkup } : {}) });
   if (!r.ok) throw new Error(r.description ?? "Telegram could not deliver the message.");
   return true;
 }
