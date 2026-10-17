@@ -16,6 +16,8 @@ import {
   removeFromRoster,
   messageByHandle,
   verifiedTelegramHandle,
+  issueParentReceipt,
+  verifyParentReceipt,
 } from "./portal.server";
 import { PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON, PARENT_DELIVERY_FALLBACK } from "./parent-telegram";
 import { getRequestHeader } from "@tanstack/react-start/server";
@@ -110,20 +112,27 @@ export const verifyTeacher = createServerFn({ method: "POST" })
   });
 
 export const getParentStatus = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ handle: handle.optional(), initData: z.string().max(10000).optional() }).refine((d) => d.handle || d.initData, "Open the bot or enter your handle").parse(d))
+  .inputValidator((d) => z.object({ handle: handle.optional(), initData: z.string().max(10000).optional(), receipt: z.string().max(2000).optional() }).refine((d) => d.handle || d.initData || d.receipt, "Enter your Telegram handle").parse(d))
   .handler(async ({ data }) => {
-    const verifiedHandle = data.initData ? verifiedTelegramHandle(data.initData) : null;
-    const parentHandle = verifiedHandle ?? data.handle;
+    const receipt = data.receipt ? verifyParentReceipt(data.receipt) : null;
+    let verifiedHandle: string | null = null;
+    if (data.initData) {
+      try { verifiedHandle = verifiedTelegramHandle(data.initData); }
+      catch (error) { if (!receipt && !data.handle) throw error; }
+    }
+    const parentHandle = verifiedHandle ?? receipt?.handle ?? data.handle;
     if (!parentHandle) throw new Error("Open the Telegram bot to verify your account.");
     const db = await getDb();
-    const { data: rows } = await db
+    let query = db
       .from("parent_requests")
       .select("status")
-      .ilike("telegram_handle", parentHandle)
-      .order("created_at", { ascending: false });
+      .ilike("telegram_handle", parentHandle);
+    if (receipt && !verifiedHandle) query = query.eq("id", receipt.id);
+    const { data: rows, error } = await query.order("created_at", { ascending: false });
+    if (error) throw new Error("Could not check your request. Please try again.");
     const statuses = (rows ?? []).map((r) => r.status);
     const status = statuses.includes("approved") ? "approved" : statuses.includes("pending") ? "pending" : statuses[0] ?? "none";
-    if (status === "approved" && verifiedHandle) {
+    if (status === "approved" && (verifiedHandle || receipt)) {
       return { status, link: "https://t.me/+za9uD7CLuG5mOWM0" };
     }
     return { status, link: null };
@@ -155,14 +164,14 @@ export const submitParentRequest = createServerFn({ method: "POST" })
     const sn = normalizeName(data.studentName);
     const student = (await loadRoster()).students.find((x) => normalizeName(x.name) === sn);
     if (!student) return { ok: false as const, reason: "student_not_found" as const };
-    const { error } = await db.from("parent_requests").insert({
+    const { data: request, error } = await db.from("parent_requests").insert({
       parent_name: data.parentName,
       telegram_handle: data.handle,
       student_name: student.name,
-    });
-    if (error) throw new Error("Could not submit request");
+    }).select("id").single();
+    if (error || !request) throw new Error("Could not submit request");
     void notify(`👪 New parent request: ${data.parentName} ${data.handle} for ${student.name}`);
-    return { ok: true as const, status: "pending" as const, link: null };
+    return { ok: true as const, status: "pending" as const, link: null, receipt: issueParentReceipt(request.id, data.handle) };
   });
 
 export const adminLogin = createServerFn({ method: "POST" })

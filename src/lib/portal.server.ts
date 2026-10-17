@@ -29,6 +29,20 @@ export function issueAdminToken() {
   return `${payload}.${sign(payload)}`;
 }
 
+/** A private receipt restores only the request created on this device. */
+export function issueParentReceipt(id: string, handle: string) {
+  const payload = Buffer.from(JSON.stringify({ id, handle })).toString("base64url");
+  return `${payload}.${sign(`parent-receipt:${payload}`)}`;
+}
+
+export function verifyParentReceipt(receipt: string) {
+  const [payload, signature, extra] = receipt.split(".");
+  if (!payload || !signature || extra || !safeEqual(signature, sign(`parent-receipt:${payload}`))) throw new Error("Invalid request receipt");
+  const data = JSON.parse(Buffer.from(payload, "base64url").toString());
+  if (typeof data.id !== "string" || typeof data.handle !== "string") throw new Error("Invalid request receipt");
+  return { id: data.id as string, handle: data.handle as string };
+}
+
 export function assertAdmin(token: string) {
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("Unauthorized");
