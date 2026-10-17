@@ -42,6 +42,16 @@ describe("parent invite access", () => {
 });
 
 describe("Telegram mini-app signatures", () => {
+  it("accepts signed parent receipts and rejects changes to their request identity", async () => {
+    const { issueParentReceipt, verifyParentReceipt } = await vi.importActual<typeof import("@/lib/portal.server")>("@/lib/portal.server");
+    vi.stubEnv("ADMIN_SESSION_SECRET", "test-only-session-secret");
+    try {
+      const receipt = issueParentReceipt("request-123", "@parent123");
+      expect(verifyParentReceipt(receipt)).toEqual({ id: "request-123", handle: "@parent123" });
+      const forged = Buffer.from(JSON.stringify({ id: "another-request", handle: "@parent123" })).toString("base64url");
+      expect(() => verifyParentReceipt(`${forged}.${receipt.split(".")[1]}`)).toThrow("Invalid request receipt");
+    } finally { vi.unstubAllEnvs(); }
+  });
   it("rejects altered or stale data even with a valid username", async () => {
     const { verifiedTelegramHandle } = await vi.importActual<typeof import("@/lib/portal.server")>("@/lib/portal.server");
     vi.stubEnv("TELEGRAM_BOT_TOKEN", "test-only-token");
