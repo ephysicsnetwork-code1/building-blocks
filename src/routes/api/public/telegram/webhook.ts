@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createHash, timingSafeEqual } from "crypto";
 import { PARENT_APPROVAL_TEXT, PARENT_PORTAL_BUTTON } from "@/lib/parent-telegram";
 
-const PORTAL_URL = "https://demobh.vercel.app/";
+const PORTAL_URL = "https://bhsss-verifications.vercel.app/";
 const PORTAL_BUTTON = {
   inline_keyboard: [[{ text: "Open verification portal", web_app: { url: PORTAL_URL } }]],
 };

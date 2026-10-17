@@ -1,4 +1,5 @@
 - [x] Add submission popup and bot start action.
 - [x] Send button-only approval notices, including webhook replies, and show delivery fallback.
 - [x] Validate approved parent access with signed Telegram identity; tests and real submission/approval/fallback flow passed.
-- [ ] Confirm live Telegram delivery after publishing and redeploying demobh.vercel.app; external Telegram calls timed out here.
+- [x] Update Telegram portal buttons to https://bhsss-verifications.vercel.app/.
+- [ ] Confirm live Telegram delivery after publishing and redeploying bhsss-verifications.vercel.app; external Telegram calls timed out here.
