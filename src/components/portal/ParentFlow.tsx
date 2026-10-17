@@ -7,7 +7,7 @@ import { submitParentRequest, getParentStatus } from "@/lib/portal.functions";
 import { GlassIcon } from "./GlassIcon";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { PARENT_BOT_URL, getTelegramInitData } from "@/lib/parent-telegram";
+import { PARENT_BOT_URL, getTelegramInitData, openParentBot } from "@/lib/parent-telegram";
 
 const KEY = "bh_parent_handle";
 type Phase = "checking" | "form" | "pending" | "approved";
@@ -22,6 +22,10 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   const [student, setStudent] = useState("");
   const [busy, setBusy] = useState(false);
   const [showStart, setShowStart] = useState(false);
+
+  function onStartBot(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (openParentBot()) e.preventDefault();
+  }
 
   // On every visit, if this device submitted before, go straight to the right screen.
   useEffect(() => {
@@ -75,7 +79,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
         ) : (
           <>
             <p className="mt-3 text-sm text-muted-foreground">Open the portal from @BHSSS_Verification_bot to verify your Telegram account and view your access link.</p>
-            <Button asChild className="mt-6"><a href={PARENT_BOT_URL} target="_blank" rel="noreferrer">🚀 Tap Here to Start Bot</a></Button>
+            <Button asChild className="mt-6"><a href={PARENT_BOT_URL} onClick={onStartBot}>🚀 Tap Here to Start Bot</a></Button>
           </>
         )}
       </div>
@@ -87,7 +91,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
         <GlassIcon icon={Hourglass} size="lg" />
         <h2 className="mt-4 text-xl font-bold">Request under review</h2>
         <p className="mt-2 text-sm text-muted-foreground">The school admin will review your request. Start @BHSSS_Verification_bot now to receive your approval notification.</p>
-        <Button asChild className="mt-6"><a href={PARENT_BOT_URL} target="_blank" rel="noreferrer">🚀 Tap Here to Start Bot</a></Button>
+        <Button asChild className="mt-6"><a href={PARENT_BOT_URL} onClick={onStartBot}>🚀 Tap Here to Start Bot</a></Button>
         <Dialog open={showStart} onOpenChange={setShowStart}>
           <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-lg">
             <DialogTitle>Request submitted</DialogTitle>
@@ -97,7 +101,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
                 <p>Step 2: You MUST open our Telegram Bot (@BHSSS_Verification_bot) and tap /start right now so the bot can notify you when your status is updated!</p>
               </div>
             </DialogDescription>
-            <Button asChild className="h-auto min-h-10 whitespace-normal text-center"><a href={PARENT_BOT_URL} target="_blank" rel="noreferrer">🚀 Tap Here to Start Bot</a></Button>
+            <Button asChild className="h-auto min-h-10 whitespace-normal text-center"><a href={PARENT_BOT_URL} onClick={onStartBot}>🚀 Tap Here to Start Bot</a></Button>
           </DialogContent>
         </Dialog>
       </div>
