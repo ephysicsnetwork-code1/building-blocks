@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
-  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson,
+  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson, adminResetTeacher, adminResetParent,
 } from "@/lib/portal.functions";
 import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
 import { GlassIcon } from "./GlassIcon";
@@ -68,6 +68,8 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const unban = useServerFn(adminUnban);
   const resolve = useServerFn(adminResolveAlert);
   const delParent = useServerFn(adminDeleteParent);
+  const resetT = useServerFn(adminResetTeacher);
+  const resetPar = useServerFn(adminResetParent);
   const addP = useServerFn(adminAddPerson);
   const editP = useServerFn(adminEditPerson);
   const removeP = useServerFn(adminRemovePerson);
@@ -185,6 +187,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                       <button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</button>
                     </>
                   )}
+                  {p.status !== "pending" && <button className="ml-3 text-warning" aria-label="Reset" title="Reset to pending" onClick={() => confirm(`Reset ${p.parent_name}'s request to pending?`) && run(() => resetPar({ data: { token, id: p.id } }), "Status reset")}><RotateCcw size={15} /></button>}
                   <button className="ml-3 text-muted-foreground" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></button>
                 </td>
               </tr>
