@@ -1,4 +1,6 @@
-- [x] Add submission popup and bot start action.
+- [ ] Preserve returning parent status and approved access securely.
+- [ ] Remove parent Start Bot prompts and show the 18-hour return reminder.
+- [ ] Test returning pending and approved parent flows.
 - [x] Send button-only approval notices, including webhook replies, and show delivery fallback.
 - [x] Validate approved parent access with signed Telegram identity; tests and real submission/approval/fallback flow passed.
 - [x] Update Telegram portal buttons to https://bhsss-verifications.vercel.app/.
