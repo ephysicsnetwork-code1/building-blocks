@@ -44,6 +44,11 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
       if (!r.ok) {
         if (r.reason === "handle_is_student") {
           toast.error("This Telegram username is already registered as a student. Parents must use their own account.");
+        } else if (r.reason === "child_already_used") {
+          toast.error("This child's name has already been used for an approved parent request. Please contact us.", {
+            action: { label: "Contact us", onClick: () => window.open(supportUrl, "_blank") },
+            duration: 8000,
+          });
         } else {
           toast.error("We couldn't find that student in the school list. Please contact us.", {
             action: { label: "Contact us", onClick: () => window.open(supportUrl, "_blank") },

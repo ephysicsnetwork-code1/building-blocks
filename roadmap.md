@@ -1,0 +1,3 @@
+- [ ] Block reuse of an approved child's name without deleting existing requests.
+- [ ] Use the new parents-only group link in approved access and Telegram confirmations; keep student access unchanged.
+- [ ] Verify parent rules and the form.
