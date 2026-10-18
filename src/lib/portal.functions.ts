@@ -17,6 +17,7 @@ import {
   messageByHandle,
 } from "./portal.server";
 import { getRequestHeader } from "@tanstack/react-start/server";
+import { hasApprovedParent, PARENT_GROUP_LINK } from "./parent-rules";
 
 async function rosterSections() {
   const { students } = await loadRoster();
@@ -120,8 +121,7 @@ export const getParentStatus = createServerFn({ method: "POST" })
       const statuses = (rows ?? []).map((r) => r.status);
       const status = statuses.includes("approved") ? "approved" : statuses.includes("pending") ? "pending" : statuses[0] ?? "none";
       if (status === "approved") {
-        const s = await getSettings();
-        return { status, link: s.telegram_link };
+        return { status, link: PARENT_GROUP_LINK };
       }
       return { status, link: null };
     } catch (e) {
@@ -148,8 +148,7 @@ export const submitParentRequest = createServerFn({ method: "POST" })
       .select("status")
       .ilike("telegram_handle", data.handle);
     if ((existing ?? []).some((r) => r.status === "approved")) {
-      const s = await getSettings();
-      return { ok: true as const, status: "approved" as const, link: s.telegram_link };
+      return { ok: true as const, status: "approved" as const, link: PARENT_GROUP_LINK };
     }
     if ((existing ?? []).some((r) => r.status === "pending"))
       return { ok: true as const, status: "pending" as const, link: null };
@@ -158,6 +157,12 @@ export const submitParentRequest = createServerFn({ method: "POST" })
     const sn = normalizeName(data.studentName);
     const student = (await loadRoster()).students.find((x) => normalizeName(x.name) === sn);
     if (!student) return { ok: false as const, reason: "student_not_found" as const };
+    const { data: approved, error: approvedError } = await db.from("parent_requests")
+      .select("student_name,status").eq("status", "approved");
+    if (approvedError) throw new Error("Could not check parent requests");
+    if (hasApprovedParent(approved ?? [], student.name)) {
+      return { ok: false as const, reason: "child_already_used" as const };
+    }
     const { error } = await db.from("parent_requests").insert({
       parent_name: data.parentName,
       telegram_handle: data.handle,
@@ -258,6 +263,17 @@ export const adminDecideParent = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     assertAdmin(data.token);
     const db = await getDb();
+    if (data.status === "approved") {
+      const { data: req, error: requestError } = await db.from("parent_requests")
+        .select("student_name").eq("id", data.id).maybeSingle();
+      if (requestError || !req) throw new Error("Could not find parent request");
+      const { data: approved, error: approvedError } = await db.from("parent_requests")
+        .select("id,student_name,status").eq("status", "approved");
+      if (approvedError) throw new Error("Could not check parent requests");
+      if (hasApprovedParent(approved ?? [], req.student_name, data.id)) {
+        throw new Error("This child's name has already been used for an approved parent request.");
+      }
+    }
     const { error } = await db
       .from("parent_requests")
       .update({ status: data.status, decided_at: new Date().toISOString() })
@@ -267,8 +283,7 @@ export const adminDecideParent = createServerFn({ method: "POST" })
     if (data.status === "approved") {
       const { data: req } = await db.from("parent_requests").select("telegram_handle,parent_name").eq("id", data.id).maybeSingle();
       if (req) {
-        const s = await getSettings();
-        messaged = await messageByHandle(req.telegram_handle, `Hello ${req.parent_name}, your Burka Harbu parent request was approved ✅\n\nJoin the group here: ${s.telegram_link}`).catch(() => false);
+        messaged = await messageByHandle(req.telegram_handle, `Hello ${req.parent_name}, your Burka Harbu parent request was approved ✅\n\nJoin the parents-only group here: ${PARENT_GROUP_LINK}`).catch(() => false);
       }
     }
     return { ok: true, messaged };
