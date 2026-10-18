@@ -23,6 +23,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   useEffect(() => {
     const saved = localStorage.getItem(KEY);
     if (!saved) { setPhase("form"); return; }
+    setHandle(saved);
     status({ data: { handle: saved } })
       .then((r) => {
         if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
