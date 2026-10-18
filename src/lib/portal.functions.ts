@@ -110,19 +110,25 @@ export const verifyTeacher = createServerFn({ method: "POST" })
 export const getParentStatus = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ handle }).parse(d))
   .handler(async ({ data }) => {
-    const db = await getDb();
-    const { data: rows } = await db
-      .from("parent_requests")
-      .select("status")
-      .ilike("telegram_handle", data.handle)
-      .order("created_at", { ascending: false });
-    const statuses = (rows ?? []).map((r) => r.status);
-    const status = statuses.includes("approved") ? "approved" : statuses.includes("pending") ? "pending" : statuses[0] ?? "none";
-    if (status === "approved") {
-      const s = await getSettings();
-      return { status, link: s.telegram_link };
+    try {
+      const db = await getDb();
+      const { data: rows } = await db
+        .from("parent_requests")
+        .select("status")
+        .ilike("telegram_handle", data.handle)
+        .order("created_at", { ascending: false });
+      const statuses = (rows ?? []).map((r) => r.status);
+      const status = statuses.includes("approved") ? "approved" : statuses.includes("pending") ? "pending" : statuses[0] ?? "none";
+      if (status === "approved") {
+        const s = await getSettings();
+        return { status, link: s.telegram_link };
+      }
+      return { status, link: null };
+    } catch (e) {
+      // Never break the parent page on a status check — fall back to the form.
+      console.error("getParentStatus failed", e);
+      return { status: "none", link: null };
     }
-    return { status, link: null };
   });
 
 export const submitParentRequest = createServerFn({ method: "POST" })

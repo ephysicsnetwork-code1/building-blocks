@@ -23,6 +23,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   useEffect(() => {
     const saved = localStorage.getItem(KEY);
     if (!saved) { setPhase("form"); return; }
+    setHandle(saved);
     status({ data: { handle: saved } })
       .then((r) => {
         if (r.status === "approved") { setLink(r.link); setPhase("approved"); }
@@ -41,9 +42,14 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
     try {
       const r = await submit({ data: { parentName, handle, studentName: student } });
       if (!r.ok) {
-        toast.error(r.reason === "handle_is_student"
-          ? "This Telegram username is already registered as a student. Parents must use their own account."
-          : "We couldn't find that student. Check the spelling of the full name.");
+        if (r.reason === "handle_is_student") {
+          toast.error("This Telegram username is already registered as a student. Parents must use their own account.");
+        } else {
+          toast.error("We couldn't find that student in the school list. Please contact us.", {
+            action: { label: "Contact us", onClick: () => window.open(supportUrl, "_blank") },
+            duration: 8000,
+          });
+        }
         return;
       }
       localStorage.setItem(KEY, normalizeHandle(handle));
@@ -78,7 +84,14 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
       <div className="glass rounded-2xl p-8 text-center">
         <GlassIcon icon={Hourglass} size="lg" />
         <h2 className="mt-4 text-xl font-bold">Request under review</h2>
-        <p className="mt-2 text-sm text-muted-foreground">The school admin will review your request. Come back here once approved to join the group.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Please wait — approval can take up to 18 hours. Once the school admin approves your request,
+          the confirmation will be sent to your Telegram username{" "}
+          <span className="font-semibold text-foreground">{normalizeHandle(handle) || "you entered"}</span>.
+        </p>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Make sure you have pressed <span className="font-semibold">/start</span> in our Telegram bot so we can message you.
+        </p>
       </div>
     );
 
