@@ -59,10 +59,85 @@ export type Database = {
         }
         Relationships: []
       }
+      bot_deliveries: {
+        Row: {
+          attempted_at: string
+          chat_id: number | null
+          completed_at: string | null
+          display_name: string | null
+          error_code: number | null
+          error_message: string | null
+          id: string
+          notification_id: string
+          status: string
+          telegram_handle: string | null
+          telegram_message_id: number | null
+        }
+        Insert: {
+          attempted_at?: string
+          chat_id?: number | null
+          completed_at?: string | null
+          display_name?: string | null
+          error_code?: number | null
+          error_message?: string | null
+          id?: string
+          notification_id: string
+          status?: string
+          telegram_handle?: string | null
+          telegram_message_id?: number | null
+        }
+        Update: {
+          attempted_at?: string
+          chat_id?: number | null
+          completed_at?: string | null
+          display_name?: string | null
+          error_code?: number | null
+          error_message?: string | null
+          id?: string
+          notification_id?: string
+          status?: string
+          telegram_handle?: string | null
+          telegram_message_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_deliveries_notification_id_fkey"
+            columns: ["notification_id"]
+            isOneToOne: false
+            referencedRelation: "bot_notifications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bot_notifications: {
+        Row: {
+          content_key: string
+          created_at: string
+          id: string
+          last_sent_at: string
+          message: string
+        }
+        Insert: {
+          content_key: string
+          created_at?: string
+          id?: string
+          last_sent_at?: string
+          message: string
+        }
+        Update: {
+          content_key?: string
+          created_at?: string
+          id?: string
+          last_sent_at?: string
+          message?: string
+        }
+        Relationships: []
+      }
       parent_requests: {
         Row: {
           created_at: string
           decided_at: string | null
+          gender: string | null
           id: string
           parent_name: string
           status: string
@@ -72,6 +147,7 @@ export type Database = {
         Insert: {
           created_at?: string
           decided_at?: string | null
+          gender?: string | null
           id?: string
           parent_name: string
           status?: string
@@ -81,11 +157,42 @@ export type Database = {
         Update: {
           created_at?: string
           decided_at?: string | null
+          gender?: string | null
           id?: string
           parent_name?: string
           status?: string
           student_name?: string
           telegram_handle?: string
+        }
+        Relationships: []
+      }
+      portal_registrations: {
+        Row: {
+          full_name: string
+          gender: string | null
+          id: string
+          kind: string
+          registered_at: string
+          source_key: string
+          telegram_handle: string | null
+        }
+        Insert: {
+          full_name: string
+          gender?: string | null
+          id?: string
+          kind: string
+          registered_at: string
+          source_key: string
+          telegram_handle?: string | null
+        }
+        Update: {
+          full_name?: string
+          gender?: string | null
+          id?: string
+          kind?: string
+          registered_at?: string
+          source_key?: string
+          telegram_handle?: string | null
         }
         Relationships: []
       }
@@ -140,6 +247,7 @@ export type Database = {
       student_joins: {
         Row: {
           full_name: string
+          gender: string | null
           grade: string
           joined_at: string
           section: string
@@ -148,6 +256,7 @@ export type Database = {
         }
         Insert: {
           full_name: string
+          gender?: string | null
           grade: string
           joined_at?: string
           section: string
@@ -156,6 +265,7 @@ export type Database = {
         }
         Update: {
           full_name?: string
+          gender?: string | null
           grade?: string
           joined_at?: string
           section?: string
@@ -168,18 +278,21 @@ export type Database = {
         Row: {
           accessed_at: string
           full_name: string
+          gender: string | null
           id: string
           telegram_handle: string
         }
         Insert: {
           accessed_at?: string
           full_name: string
+          gender?: string | null
           id?: string
           telegram_handle: string
         }
         Update: {
           accessed_at?: string
           full_name?: string
+          gender?: string | null
           id?: string
           telegram_handle?: string
         }
