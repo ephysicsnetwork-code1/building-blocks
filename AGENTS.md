@@ -15,3 +15,7 @@
 - Failed verifications are tracked per normalized typed name in verification_attempts; reaching the limit bans on the public side and writes admin_alerts, and only admins clear it.
 - The Telegram bot webhook lives at /api/public/telegram/webhook, verified by a secret derived from TELEGRAM_BOT_TOKEN; it records chat IDs in telegram_users so the server can message people by handle after they press /start.
 - Parent-specific invite and normalized approved-child matching live in src/lib/parent-rules.ts and are shared by submission, admin decisions, and Telegram replies to keep parent access separate from student settings.
+
+- All app bot sendMessage calls pass through telegramCall to persist a content-grouped notification and each delivery outcome before returning; this makes failed and blocked deliveries auditable. Out-of-app broadcasts must also write these records.
+- Registration history is an append-preserved archive populated by database triggers and backfilled from existing registrations; resetting joins or deleting requests must not erase historical registration dates.
+- Admin record views use token-validated paginated server functions and nullable explicit gender values; existing users are never assigned an inferred gender.

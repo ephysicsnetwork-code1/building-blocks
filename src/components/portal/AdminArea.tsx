@@ -1,3 +1,6 @@
+import { NotificationHistory, RegistrationHistory } from "./AdminRecords";
+import { matchesAdminSearch } from "@/lib/admin-record-rules";
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -47,17 +50,17 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (t
       <form onSubmit={submit} className="glass glow w-full max-w-sm space-y-4 rounded-2xl p-6" autoComplete="off">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-3 text-xl font-bold"><GlassIcon icon={ShieldCheck} size="sm" /> Admin login</h2>
-          <button type="button" onClick={onClose} className="text-muted-foreground" aria-label="Close"><X size={18} /></button>
+          <Button type="button" onClick={onClose} className="text-muted-foreground" aria-label="Close"><X size={18} /></Button>
         </div>
         <input className="field" placeholder="Username" value={u} onChange={(e) => setU(e.target.value)} autoComplete="off" />
         <input className="field" type="password" placeholder="Password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" />
-        <button className="btn-glow w-full" disabled={busy || !u || !p}>{busy ? "Signing in…" : "Sign in"}</button>
+        <Button type="submit" className="btn-glow w-full" disabled={busy || !u || !p}>{busy ? "Signing in…" : "Sign in"}</Button>
       </form>
     </div>
   );
 }
 
-type View = "security" | "parents" | "students" | "teachers" | "settings";
+type View = "security" | "parents" | "students" | "teachers" | "registrations" | "notifications" | "settings";
 
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const get = useServerFn(adminGetData);
@@ -104,7 +107,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
     <div className="glass rounded-2xl p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold">Admin dashboard</h2>
-        <button className="btn-ghost text-sm" onClick={onLogout}>Log out</button>
+        <Button className="btn-ghost text-sm" onClick={onLogout}>Log out</Button>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
         <Stat label="Students joined" value={data.joins.length} />
@@ -113,19 +116,22 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         <Stat label="Locked names" value={banned.length} />
       </div>
       <div className="mt-5 flex gap-2 overflow-x-auto">
-        {(["security", "parents", "students", "teachers", "settings"] as View[]).map((v) => (
-          <button key={v} onClick={() => setView(v)} className={`btn-ghost whitespace-nowrap text-sm capitalize ${view === v ? "glow text-primary" : ""}`}>{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</button>
+        {(["security", "parents", "students", "teachers", "registrations", "notifications", "settings"] as View[]).map((v) => (
+          <Button key={v} onClick={() => setView(v)} className={`btn-ghost whitespace-nowrap text-sm capitalize ${view === v ? "glow text-primary" : ""}`}>{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</Button>
         ))}
       </div>
 
       {openAlerts.length > 0 && view !== "security" && (
-        <button onClick={() => setView("security")} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-warning/40 p-3 text-left text-sm">
+        <Button onClick={() => setView("security")} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-warning/40 p-3 text-left text-sm">
           <GlassIcon icon={ShieldAlert} size="sm" />
           <span>{openAlerts.length} security alert(s) need review</span>
-        </button>
+        </Button>
       )}
 
       <div className="mt-4">
+        {view === "registrations" && <RegistrationHistory token={token} />}
+        {view === "notifications" && <NotificationHistory token={token} />}
+        {(view === "parents" || view === "teachers") && <input className="field mb-3" aria-label="Search admin records" placeholder="Search name or Telegram username…" value={q} onChange={(e) => setQ(e.target.value)} />}
         {view === "security" && (
           <div className="space-y-5">
             <div>
@@ -135,7 +141,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <tr key={a.id} className={`border-t ${a.resolved ? "opacity-50" : ""}`}>
                     <td className="p-2 whitespace-nowrap text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</td>
                     <td className="p-2">{a.message}</td>
-                    <td className="p-2">{!a.resolved && <button className="text-primary" onClick={() => run(() => resolve({ data: { token, id: a.id } }), "Marked as reviewed")}>Dismiss</button>}</td>
+                    <td className="p-2">{!a.resolved && <Button className="text-primary" onClick={() => run(() => resolve({ data: { token, id: a.id } }), "Marked as reviewed")}>Dismiss</Button>}</td>
                   </tr>
                 ))}
                 {data.alerts.length === 0 && <Empty cols={3} />}
@@ -150,9 +156,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <td className="p-2">{a.failed_count}</td>
                     <td className={`p-2 ${a.banned ? "text-destructive" : "text-warning"}`}>{a.banned ? "Locked" : "Watching"}</td>
                     <td className="p-2">
-                      <button className="text-success" onClick={() => run(() => unban({ data: { token, subject: a.subject } }), a.banned ? "Unbanned & re-added" : "Attempts cleared")}>
+                      <Button className="text-success" onClick={() => run(() => unban({ data: { token, subject: a.subject } }), a.banned ? "Unbanned & re-added" : "Attempts cleared")}>
                         {a.banned ? "Unban / Re-add" : "Clear"}
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -163,7 +169,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         )}
         {view === "parents" && (
           <Table head={["Parent", "Handle", "Student", "Status", ""]}>
-            {data.parents.map((p) => (
+            {data.parents.filter((p) => matchesAdminSearch(q, p.parent_name, p.student_name, p.telegram_handle)).map((p) => (
               <tr key={p.id} className="border-t">
                 <td className="p-2">{p.parent_name}</td>
                 <td className="p-2">{p.telegram_handle}</td>
@@ -172,11 +178,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 <td className="p-2 whitespace-nowrap">
                   {p.status === "pending" && (
                     <>
-                      <button className="text-success" onClick={() => run(() => decide({ data: { token, id: p.id, status: "approved" } }), "Approved")}>Approve</button>
-                      <button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</button>
+                      <Button className="text-success" onClick={() => run(() => decide({ data: { token, id: p.id, status: "approved" } }).then((r) => { if (!r.messaged) toast.warning("Approval saved! Please remind the parent to open @BHSSS_Verification_bot and tap /start to receive their approval notification."); }), "Approved")}>Approve</Button>
+                      <Button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</Button>
                     </>
                   )}
-                  <button className="ml-3 text-muted-foreground" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></button>
+                  <Button className="ml-3 text-muted-foreground" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></Button>
                 </td>
               </tr>
             ))}
@@ -187,11 +193,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         {view === "students" && (
           <>
             <div className="mb-3 flex gap-2">
-              <input className="field" placeholder="Search students…" value={q} onChange={(e) => setQ(e.target.value)} />
-              <button className="btn-glow flex items-center gap-1 whitespace-nowrap" onClick={() => setEditing({ kind: "student", name: "", grade: "9", section: "A", stream: "" })}><Plus size={16} /> Add</button>
+              <input className="field" placeholder="Search name or Telegram username…" value={q} onChange={(e) => setQ(e.target.value)} />
+              <Button className="btn-glow flex items-center gap-1 whitespace-nowrap" onClick={() => setEditing({ kind: "student", name: "", grade: "9", section: "A", stream: "" })}><Plus size={16} /> Add</Button>
             </div>
             <Table head={["Name", "Class", "Status", "Handle", ""]}>
-              {data.students.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())).map((s) => {
+              {data.students.filter((s) => matchesAdminSearch(q, s.name, joined.get(s.name)?.telegram_handle)).map((s) => {
                 const j = joined.get(s.name);
                 return (
                   <tr key={s.name + s.grade + s.section} className="border-t">
@@ -201,9 +207,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <td className="p-2">{j?.telegram_handle ?? "—"}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-3">
-                        <button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></button>
-                        <button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></button>
-                        {j && <button className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></button>}
+                        <Button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></Button>
+                        <Button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></Button>
+                        {j && <Button className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></Button>}
                       </div>
                     </td>
                   </tr>
@@ -216,10 +222,10 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         {view === "teachers" && (
           <>
           <div className="mb-3 flex justify-end">
-            <button className="btn-glow flex items-center gap-1" onClick={() => setEditing({ kind: "teacher", name: "", grade: "", section: "", stream: "" })}><Plus size={16} /> Add teacher</button>
+            <Button className="btn-glow flex items-center gap-1" onClick={() => setEditing({ kind: "teacher", name: "", grade: "", section: "", stream: "" })}><Plus size={16} /> Add teacher</Button>
           </div>
           <Table head={["#", "Official name", "Last verified as", ""]}>
-            {data.teachers.map((t, i) => {
+            {data.teachers.filter((t) => matchesAdminSearch(q, t.name, ...data.teacherAccess.filter((a) => a.full_name === t.name).map((a) => a.telegram_handle))).map((t, i) => {
               const a = data.teacherAccess.find((x) => x.full_name === t.name);
               return (
                 <tr key={t.name} className="border-t">
@@ -228,8 +234,8 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <td className="p-2">{a ? `${a.telegram_handle} · ${new Date(a.accessed_at).toLocaleDateString()}` : "—"}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-3">
-                      <button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></button>
-                      <button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></button>
+                      <Button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></Button>
+                      <Button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></Button>
                     </div>
                   </td>
                 </tr>
@@ -267,8 +273,8 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 </div>
               )}
               <div className="flex gap-2">
-                <button className="btn-glow flex-1" disabled={editing.name.trim().length < 3}>Save</button>
-                <button type="button" className="btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
+                <Button type="submit" className="btn-glow flex-1" disabled={editing.name.trim().length < 3}>Save</Button>
+                <Button type="button" className="btn-ghost" onClick={() => setEditing(null)}>Cancel</Button>
               </div>
             </form>
           </div>
@@ -283,11 +289,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
             <Field label="Admin support handle" value={settings.support_handle} onChange={(v) => setSettings({ ...settings, support_handle: v })} />
             <Field label="Bot notification chat ID (optional)" value={settings.notify_chat_id} onChange={(v) => setSettings({ ...settings, notify_chat_id: v })} />
             <div className="flex flex-wrap gap-3">
-              <button className="btn-glow">Save settings</button>
-              <button type="button" className="btn-ghost" onClick={async () => {
+              <Button type="submit" className="btn-glow">Save settings</Button>
+              <Button type="button" className="btn-ghost" onClick={async () => {
                 const r = await testBot({ data: { token } });
                 r.ok ? toast.success(r.message) : toast.error(r.message);
-              }}>Test Telegram bot</button>
+              }}>Test Telegram bot</Button>
             </div>
           </form>
         )}
