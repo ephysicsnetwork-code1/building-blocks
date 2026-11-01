@@ -1,3 +1,5 @@
+import { GenderField } from "./GenderField";
+import type { Gender } from "@/lib/admin-record-rules";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,6 +13,7 @@ export function TeacherFlow({ supportUrl, support }: { supportUrl: string; suppo
   const verify = useServerFn(verifyTeacher);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
@@ -20,7 +23,7 @@ export function TeacherFlow({ supportUrl, support }: { supportUrl: string; suppo
     if (!HANDLE_RE.test(handle.trim())) { toast.error("Enter a valid Telegram handle"); return; }
     setBusy(true);
     try {
-      setResult((await verify({ data: { name, handle } })) as Result);
+      setResult((await verify({ data: { name, handle, gender: gender || null } })) as Result);
     } catch {
       toast.error("Verification failed. Please try again.");
     } finally {
@@ -43,6 +46,7 @@ export function TeacherFlow({ supportUrl, support }: { supportUrl: string; suppo
         <label className="text-sm font-semibold">Telegram handle</label>
         <input className="field mt-2" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={33} placeholder="@username" />
       </div>
+      <GenderField value={gender} onChange={setGender} />
       <button className="btn-glow w-full" disabled={busy}>{busy ? "Checking…" : "Verify"}</button>
     </form>
   );

@@ -1,4 +1,5 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { deliveryStatus } from "./admin-record-rules";
 import { MAX_FAILED_ATTEMPTS, normalizeName } from "./school-constants";
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -56,12 +57,54 @@ export async function getSettings() {
 export async function telegramCall(method: string, body: Record<string, unknown> = {}) {
   const token = process.env["TELEGRAM_BOT_TOKEN"];
   if (!token) throw new Error("Telegram bot is not configured");
-  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return (await res.json()) as { ok: boolean; result?: any; description?: string };
+  const delivery = method === "sendMessage" ? await beginDelivery(body) : null;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const result = (await res.json()) as { ok: boolean; result?: any; description?: string; error_code?: number };
+    if (delivery) await finishDelivery(delivery, {
+      status: deliveryStatus(result.ok, result.description),
+      error_code: result.ok ? null : result.error_code ?? res.status,
+      error_message: result.ok ? null : result.description ?? "Telegram delivery failed",
+      telegram_message_id: result.ok ? result.result?.message_id ?? null : null,
+    });
+    return result;
+  } catch {
+    if (delivery) await finishDelivery(delivery, { status: "failed", error_message: "Telegram could not be reached" });
+    throw new Error("Telegram could not be reached");
+  }
+}
+
+async function beginDelivery(body: Record<string, unknown>, recipient?: { handle: string }) {
+  const db = await getDb();
+  const message = typeof body.text === "string" ? body.text : "";
+  const key = createHash("sha256").update(JSON.stringify([message, body.reply_markup ?? null])).digest("hex");
+  const { data: notification, error } = await db.from("bot_notifications").upsert({
+    content_key: key, message, last_sent_at: new Date().toISOString(),
+  }, { onConflict: "content_key" }).select("id").single();
+  if (error || !notification) throw new Error("Could not record notification");
+  const chat = Number(body.chat_id);
+  const chatId = Number.isSafeInteger(chat) ? chat : null;
+  const { data: user } = chatId === null ? { data: null } : await db.from("telegram_users").select("username,first_name").eq("chat_id", chatId).maybeSingle();
+  const { data: delivery, error: insertError } = await db.from("bot_deliveries").insert({
+    notification_id: notification.id, chat_id: chatId,
+    telegram_handle: recipient?.handle ?? (user?.username ? `@${user.username}` : null),
+    display_name: user?.first_name ?? null,
+    status: recipient ? "not_started" : "sending",
+    error_message: recipient ? "User has not started the bot or their username is not registered with it" : null,
+    completed_at: recipient ? new Date().toISOString() : null,
+  }).select("id").single();
+  if (insertError || !delivery) throw new Error("Could not record delivery");
+  return delivery.id;
+}
+
+async function finishDelivery(id: string, result: { status: "delivered" | "blocked" | "failed"; error_code?: number | null; error_message?: string | null; telegram_message_id?: number | null }) {
+  const db = await getDb();
+  const { error } = await db.from("bot_deliveries").update({ ...result, completed_at: new Date().toISOString() }).eq("id", id);
+  if (error) throw new Error("Could not save delivery outcome");
 }
 
 
@@ -142,7 +185,10 @@ export async function addToRoster(kind: "student" | "teacher", e: { name: string
 export async function messageByHandle(handle: string, text: string) {
   const db = await getDb();
   const { data } = await db.from("telegram_users").select("chat_id").ilike("username", handle.replace(/^@/, "")).maybeSingle();
-  if (!data) return false;
+  if (!data) {
+    await beginDelivery({ text }, { handle });
+    return false;
+  }
   const r = await telegramCall("sendMessage", { chat_id: data.chat_id, text });
   return r.ok;
 }

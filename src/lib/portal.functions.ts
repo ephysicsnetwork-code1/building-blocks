@@ -18,15 +18,17 @@ import {
 } from "./portal.server";
 import { getRequestHeader } from "@tanstack/react-start/server";
 import { hasApprovedParent, PARENT_GROUP_LINK } from "./parent-rules";
+import { genderSchema } from "./admin-record-rules";
 
 async function rosterSections() {
   const { students } = await loadRoster();
   const out: Record<string, string[]> = {};
   for (const s of students) {
     out[s.grade] ??= [];
-    if (!out[s.grade]!.includes(s.section)) out[s.grade]!.push(s.section);
+    const sections = out[s.grade];
+    if (sections && !sections.includes(s.section)) sections.push(s.section);
   }
-  for (const g of Object.keys(out)) out[g]!.sort();
+  for (const g of Object.keys(out)) out[g]?.sort();
   return out;
 }
 
@@ -57,6 +59,7 @@ export const verifyStudent = createServerFn({ method: "POST" })
         section: z.string().max(2),
         name: z.string().trim().min(2).max(120),
         handle,
+        gender: genderSchema.nullable().optional(),
       })
       .parse(d),
   )
@@ -81,6 +84,7 @@ export const verifyStudent = createServerFn({ method: "POST" })
       section: data.section,
       stream: data.stream,
       telegram_handle: data.handle,
+      gender: data.gender ?? null,
     });
     if (error) {
       if (error.code === "23505") return { ok: false as const, reason: "already_joined" as const };
@@ -89,20 +93,21 @@ export const verifyStudent = createServerFn({ method: "POST" })
     }
     await clearFailures(data.name);
     const s = await getSettings();
-    void messageByHandle(data.handle, "You have successfully joined the Burka Harbu student network!").catch(() => {});
+    await messageByHandle(data.handle, "You have successfully joined the Burka Harbu student network!").catch(() => false);
     void notify(`✅ Student joined: ${name} (G${data.grade}${data.section}) ${data.handle}`);
     return { ok: true as const, link: s.telegram_link, name, handle: data.handle };
   });
 
 export const verifyTeacher = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ name: z.string().min(2).max(120), handle }).parse(d))
+  .inputValidator((d) => z.object({ name: z.string().min(2).max(120), handle, gender: genderSchema.nullable().optional() }).parse(d))
   .handler(async ({ data }) => {
     const { teachers } = await loadRoster();
     const tn = normalizeName(data.name);
     const name = teachers.find((t) => normalizeName(t.name) === tn)?.name ?? null;
     if (!name) return { ok: false as const, reason: "not_found" as const };
     const db = await getDb();
-    await db.from("teacher_access").insert({ full_name: name, telegram_handle: data.handle });
+    const { error } = await db.from("teacher_access").insert({ full_name: name, telegram_handle: data.handle, gender: data.gender ?? null });
+    if (error) throw new Error("Could not save teacher registration");
     const s = await getSettings();
     void notify(`👨‍🏫 Teacher verified: ${name} ${data.handle}`);
     return { ok: true as const, link: s.telegram_link, name, handle: data.handle };
@@ -137,6 +142,7 @@ export const submitParentRequest = createServerFn({ method: "POST" })
       .object({
         parentName: z.string().trim().min(3).max(120),
         handle,
+        gender: genderSchema.nullable().optional(),
         studentName: z.string().trim().min(2).max(120),
       })
       .parse(d),
@@ -166,6 +172,7 @@ export const submitParentRequest = createServerFn({ method: "POST" })
     const { error } = await db.from("parent_requests").insert({
       parent_name: data.parentName,
       telegram_handle: data.handle,
+      gender: data.gender ?? null,
       student_name: student.name,
     });
     if (error) throw new Error("Could not submit request");
@@ -179,7 +186,7 @@ export const adminLogin = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     await new Promise((r) => setTimeout(r, 400));
-    const ip = (getRequestHeader("cf-connecting-ip") || getRequestHeader("x-forwarded-for") || "unknown").split(",")[0]!.trim();
+    const ip = (getRequestHeader("cf-connecting-ip") || getRequestHeader("x-forwarded-for") || "unknown").split(",")[0]?.trim() ?? "unknown";
     const subject = `admin-login:${ip}`;
     const db = await getDb();
     const { data: prev } = await db.from("verification_attempts").select("failed_count,banned").eq("subject", subject).maybeSingle();
@@ -327,7 +334,7 @@ export const adminEditPerson = createServerFn({ method: "POST" })
     await addToRoster(p.kind, p);
     if (p.kind === "student" && data.oldName !== p.name) {
       const db = await getDb();
-      await db.from("student_joins").update({ full_name: p.name, grade: p.grade!, section: p.section! }).eq("full_name", data.oldName);
+      await db.from("student_joins").update({ full_name: p.name, grade: p.grade, section: p.section }).eq("full_name", data.oldName);
     }
     return { ok: true };
   });
@@ -391,4 +398,63 @@ export const searchStudents = createServerFn({ method: "POST" })
         return n.startsWith(q) || n.split(" ").some((w) => w.startsWith(q));
       })
       .slice(0, 5);
+  });
+
+export const adminGetRegistrations = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ q: z.string().max(120).default(""), page: z.number().int().min(0).default(0) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    let query = db.from("portal_registrations").select("*", { count: "exact" });
+    const q = data.q.trim().replace(/^@/, "").replace(/[^\p{L}\p{N}_ .-]/gu, "");
+    if (q) query = query.or(`full_name.ilike.%${q}%,telegram_handle.ilike.%${q}%`);
+    const { data: rows, count, error } = await query.order("registered_at", { ascending: false }).range(data.page * 50, data.page * 50 + 49);
+    if (error) throw new Error("Could not load registrations");
+    return { rows: rows ?? [], count: count ?? 0 };
+  });
+
+export const adminUpdateGender = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ id: z.string().uuid(), gender: genderSchema.nullable() }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { data: row, error } = await db.from("portal_registrations").select("kind,source_key").eq("id", data.id).single();
+    if (error || !row) throw new Error("Registration not found");
+    const source = row.kind === "student" ? db.from("student_joins").update({ gender: data.gender }).eq("full_name", row.source_key)
+      : row.kind === "teacher" ? db.from("teacher_access").update({ gender: data.gender }).eq("id", row.source_key)
+      : row.kind === "parent" ? db.from("parent_requests").update({ gender: data.gender }).eq("id", row.source_key) : null;
+    if (source) { const { error: updateError } = await source; if (updateError) throw new Error("Could not update gender"); }
+    const { error: saveError } = await db.from("portal_registrations").update({ gender: data.gender }).eq("id", data.id);
+    if (saveError) throw new Error("Could not save profile");
+    return { ok: true };
+  });
+
+export const adminGetNotificationHistory = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ page: z.number().int().min(0).default(0) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { data: rows, count, error } = await db.from("bot_notifications").select("*", { count: "exact" }).order("last_sent_at", { ascending: false }).range(data.page * 25, data.page * 25 + 24);
+    if (error) throw new Error("Could not load notifications");
+    return { rows: rows ?? [], count: count ?? 0 };
+  });
+
+export const adminGetNotificationDeliveries = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ id: z.string().uuid(), q: z.string().max(120).default(""), status: z.enum(["all","delivered","blocked","failed","not_started","sending"]).default("all"), page: z.number().int().min(0).default(0) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const statuses = ["delivered", "blocked", "failed", "not_started", "sending"] as const;
+    const totals = await Promise.all(statuses.map(async (status) => {
+      const { count, error } = await db.from("bot_deliveries").select("id", { count: "exact", head: true }).eq("notification_id", data.id).eq("status", status);
+      if (error) throw new Error("Could not load delivery totals");
+      return { status, count: count ?? 0 };
+    }));
+    let query = db.from("bot_deliveries").select("*", { count: "exact" }).eq("notification_id", data.id);
+    if (data.status !== "all") query = query.eq("status", data.status);
+    const q = data.q.trim().replace(/^@/, "").replace(/[^\p{L}\p{N}_ .-]/gu, "");
+    if (q) query = query.or(`telegram_handle.ilike.%${q}%,display_name.ilike.%${q}%`);
+    const { data: rows, count, error } = await query.order("attempted_at", { ascending: false }).range(data.page * 50, data.page * 50 + 49);
+    if (error) throw new Error("Could not load delivery history");
+    return { rows: rows ?? [], count: count ?? 0, totals };
   });

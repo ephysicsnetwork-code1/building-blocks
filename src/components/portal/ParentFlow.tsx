@@ -1,3 +1,5 @@
+import { GenderField } from "./GenderField";
+import type { Gender } from "@/lib/admin-record-rules";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,6 +19,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
   const [parentName, setParentName] = useState("");
   const [handle, setHandle] = useState("");
   const [student, setStudent] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
   const [busy, setBusy] = useState(false);
 
   // On every visit, if this device submitted before, go straight to the right screen.
@@ -40,7 +43,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
     if (student.trim().length < 2) { toast.error("Type your child's full name"); return; }
     setBusy(true);
     try {
-      const r = await submit({ data: { parentName, handle, studentName: student } });
+      const r = await submit({ data: { parentName, handle, studentName: student, gender: gender || null } });
       if (!r.ok) {
         if (r.reason === "handle_is_student") {
           toast.error("This Telegram username is already registered as a student. Parents must use their own account.");
@@ -95,7 +98,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
           <span className="font-semibold text-foreground">{normalizeHandle(handle) || "you entered"}</span>.
         </p>
         <p className="mt-3 text-xs text-muted-foreground">
-          Make sure you have pressed <span className="font-semibold">/start</span> in our Telegram bot so we can message you.
+          Please come back after 18 hours to check your request. Approval may happen sooner.
         </p>
       </div>
     );
@@ -116,6 +119,7 @@ export function ParentFlow({ supportUrl, support }: { supportUrl: string; suppor
         <label className="text-sm font-semibold">Your child's full name</label>
         <input className="field mt-2" value={student} onChange={(e) => setStudent(e.target.value)} maxLength={120} placeholder="As registered at school" autoComplete="off" />
       </div>
+      <GenderField value={gender} onChange={setGender} />
       <button className="btn-glow w-full" disabled={busy}>{busy ? "Submitting…" : "Submit request"}</button>
     </form>
   );

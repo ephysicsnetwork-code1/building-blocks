@@ -1,3 +1,5 @@
+import { GenderField } from "./GenderField";
+import type { Gender } from "@/lib/admin-record-rules";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
@@ -26,6 +28,7 @@ export function StudentFlow({
   const [matches, setMatches] = useState<Match[]>([]);
   const [picked, setPicked] = useState<Match | null>(null);
   const [handle, setHandle] = useState("");
+  const [gender, setGender] = useState<Gender | "">("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
 
@@ -43,7 +46,7 @@ export function StudentFlow({
     setBusy(true);
     try {
       const r = (await verify({
-        data: { grade: picked.grade as "9", stream: null, section: picked.section, name: picked.name, handle },
+        data: { grade: picked.grade as "9", stream: null, section: picked.section, name: picked.name, handle, gender: gender || null },
       })) as Result;
       setResult(r);
     } catch {
@@ -113,6 +116,7 @@ export function StudentFlow({
           <label className="text-sm font-semibold">Your Telegram handle</label>
           <input className="field mt-2" placeholder="@username" value={handle} onChange={(e) => setHandle(e.target.value)} maxLength={33} />
         </div>
+        <GenderField value={gender} onChange={setGender} />
         <button className="btn-glow w-full" disabled={!picked || busy} onClick={submit}>
           {busy ? "Verifying…" : "Verify & join"}
         </button>

@@ -1,3 +1,5 @@
-- [ ] Block reuse of an approved child's name without deleting existing requests.
-- [ ] Use the new parents-only group link in approved access and Telegram confirmations; keep student access unchanged.
-- [ ] Verify parent rules and the form.
+- [x] Preserve approved-child matching and parents-only invite rules.
+- [ ] Record bot messages and recipient delivery outcomes, including blocked chats.
+- [ ] Add admin notification history and dated registrations with username search.
+- [ ] Collect gender on registration and allow admin profile updates without guessing existing genders.
+- [ ] Verify admin views, saved data, delivery tracking, and existing parent rules.
