@@ -80,13 +80,13 @@ export async function telegramCall(method: string, body: Record<string, unknown>
 
 async function beginDelivery(body: Record<string, unknown>, recipient?: { handle: string }) {
   const db = await getDb();
-  const message = typeof body.text === "string" ? body.text : "";
-  const key = createHash("sha256").update(JSON.stringify([message, body.reply_markup ?? null])).digest("hex");
+  const message = typeof body["text"] === "string" ? body["text"] : "";
+  const key = createHash("sha256").update(JSON.stringify([message, body["reply_markup"] ?? null])).digest("hex");
   const { data: notification, error } = await db.from("bot_notifications").upsert({
     content_key: key, message, last_sent_at: new Date().toISOString(),
   }, { onConflict: "content_key" }).select("id").single();
   if (error || !notification) throw new Error("Could not record notification");
-  const chat = Number(body.chat_id);
+  const chat = Number(body["chat_id"]);
   const chatId = Number.isSafeInteger(chat) ? chat : null;
   const { data: user } = chatId === null ? { data: null } : await db.from("telegram_users").select("username,first_name").eq("chat_id", chatId).maybeSingle();
   const { data: delivery, error: insertError } = await db.from("bot_deliveries").insert({

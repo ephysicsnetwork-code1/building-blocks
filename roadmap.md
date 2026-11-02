@@ -1,5 +1,5 @@
 - [x] Preserve approved-child matching and parents-only invite rules.
-- [ ] Record bot messages and recipient delivery outcomes, including blocked chats.
-- [ ] Add admin notification history and dated registrations with username search.
-- [ ] Collect gender on registration and allow admin profile updates without guessing existing genders.
-- [ ] Verify admin views, saved data, delivery tracking, and existing parent rules.
+- [x] Record bot messages and recipient delivery outcomes, including blocked chats (delivery success/failure persistence covered by tests).
+- [x] Add admin notification history and dated registrations with username search.
+- [x] Collect gender on registration and allow admin profile updates without guessing existing genders.
+- [x] Verify signed-in admin views, profile saving, saved registrations, delivery tests, and existing parent rules; no unsolicited live bot message sent.

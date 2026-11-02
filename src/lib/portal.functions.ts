@@ -332,7 +332,7 @@ export const adminEditPerson = createServerFn({ method: "POST" })
     if (p.kind === "student" && (!p.grade || !p.section)) throw new Error("Grade and section are required");
     await removeFromRoster(p.kind, data.oldName);
     await addToRoster(p.kind, p);
-    if (p.kind === "student" && data.oldName !== p.name) {
+    if (p.kind === "student" && p.grade && p.section && data.oldName !== p.name) {
       const db = await getDb();
       await db.from("student_joins").update({ full_name: p.name, grade: p.grade, section: p.section }).eq("full_name", data.oldName);
     }

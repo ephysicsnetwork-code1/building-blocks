@@ -117,7 +117,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
       </div>
       <div className="mt-5 flex gap-2 overflow-x-auto">
         {(["security", "parents", "students", "teachers", "registrations", "notifications", "settings"] as View[]).map((v) => (
-          <Button key={v} onClick={() => setView(v)} className={`btn-ghost whitespace-nowrap text-sm capitalize ${view === v ? "glow text-primary" : ""}`}>{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</Button>
+          <Button key={v} variant={view === v ? "default" : "outline"} onClick={() => { setView(v); setQ(""); }} className="shrink-0 whitespace-nowrap text-sm capitalize">{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</Button>
         ))}
       </div>
 
