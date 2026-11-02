@@ -22,3 +22,7 @@ export function deliveryStatus(ok: boolean, description = "") {
 export function genderLabel(value: string | null) {
   return GENDERS.find((g) => g.value === value)?.label ?? "Not provided";
 }
+
+export function isRetryableDelivery(status: string, code: number | null, chatId: number | null, hasPayload = true) {
+  return status === "failed" && chatId !== null && hasPayload && code !== null && (code === 429 || code >= 500 && code <= 599);
+}

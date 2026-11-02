@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
-import { deliveryStatus } from "./admin-record-rules";
+import { deliveryStatus, isRetryableDelivery } from "./admin-record-rules";
 import { MAX_FAILED_ATTEMPTS, normalizeName } from "./school-constants";
 
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
@@ -54,28 +54,35 @@ export async function getSettings() {
   };
 }
 
-export async function telegramCall(method: string, body: Record<string, unknown> = {}) {
+export async function telegramCall(method: string, body: Record<string, unknown> = {}, claimedDelivery?: string) {
   const token = process.env["TELEGRAM_BOT_TOKEN"];
   if (!token) throw new Error("Telegram bot is not configured");
-  const delivery = method === "sendMessage" ? await beginDelivery(body) : null;
+  const delivery = method === "sendMessage" ? claimedDelivery ?? await beginDelivery(body) : null;
+  let result: { ok: boolean; result?: any; description?: string; error_code?: number; parameters?: { retry_after?: number } };
+  let httpStatus = 0;
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const result = (await res.json()) as { ok: boolean; result?: any; description?: string; error_code?: number };
-    if (delivery) await finishDelivery(delivery, {
-      status: deliveryStatus(result.ok, result.description),
-      error_code: result.ok ? null : result.error_code ?? res.status,
-      error_message: result.ok ? null : result.description ?? "Telegram delivery failed",
-      telegram_message_id: result.ok ? result.result?.message_id ?? null : null,
-    });
-    return result;
+    httpStatus = res.status;
+    result = await res.json();
   } catch {
-    if (delivery) await finishDelivery(delivery, { status: "failed", error_message: "Telegram could not be reached" });
-    throw new Error("Telegram could not be reached");
+    if (delivery) await finishDelivery(delivery, { status: "failed", retryable: false, error_message: "Delivery outcome unknown: Telegram could not be reached. Retry disabled to avoid duplicates." });
+    throw new Error("Telegram delivery outcome unknown; retry disabled to avoid duplicates");
   }
+  const status = deliveryStatus(result.ok, result.description);
+  const code = result.ok ? null : result.error_code ?? httpStatus;
+  const wait = result.parameters?.retry_after ?? 30;
+  const retryable = isRetryableDelivery(status, code, Number(body["chat_id"]));
+  if (delivery) await finishDelivery(delivery, {
+    status, error_code: code, retryable,
+    retry_after: retryable ? new Date(Date.now() + Math.max(1, wait) * 1000).toISOString() : null,
+    error_message: result.ok ? null : result.description ?? "Telegram delivery failed",
+    telegram_message_id: result.ok ? result.result?.message_id ?? null : null,
+  });
+  return result;
 }
 
 async function beginDelivery(body: Record<string, unknown>, recipient?: { handle: string }) {
@@ -83,7 +90,7 @@ async function beginDelivery(body: Record<string, unknown>, recipient?: { handle
   const message = typeof body["text"] === "string" ? body["text"] : "";
   const key = createHash("sha256").update(JSON.stringify([message, body["reply_markup"] ?? null])).digest("hex");
   const { data: notification, error } = await db.from("bot_notifications").upsert({
-    content_key: key, message, last_sent_at: new Date().toISOString(),
+    content_key: key, message, payload: JSON.parse(JSON.stringify({ ...body, chat_id: undefined })), last_sent_at: new Date().toISOString(),
   }, { onConflict: "content_key" }).select("id").single();
   if (error || !notification) throw new Error("Could not record notification");
   const chat = Number(body["chat_id"]);
@@ -101,7 +108,7 @@ async function beginDelivery(body: Record<string, unknown>, recipient?: { handle
   return delivery.id;
 }
 
-async function finishDelivery(id: string, result: { status: "delivered" | "blocked" | "failed"; error_code?: number | null; error_message?: string | null; telegram_message_id?: number | null }) {
+async function finishDelivery(id: string, result: { status: "delivered" | "blocked" | "failed"; error_code?: number | null; error_message?: string | null; telegram_message_id?: number | null; retryable?: boolean; retry_after?: string | null }) {
   const db = await getDb();
   const { error } = await db.from("bot_deliveries").update({ ...result, completed_at: new Date().toISOString() }).eq("id", id);
   if (error) throw new Error("Could not save delivery outcome");

@@ -458,3 +458,26 @@ export const adminGetNotificationDeliveries = createServerFn({ method: "POST" })
     if (error) throw new Error("Could not load delivery history");
     return { rows: rows ?? [], count: count ?? 0, totals };
   });
+
+export const adminRetryDelivery = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { data: claimed, error } = await db.rpc("claim_bot_delivery_retry", { delivery_id: data.id });
+    if (error) throw new Error("Could not claim delivery retry");
+    const claim = z.object({ ok: z.boolean(), reason: z.string().optional(), id: z.string().optional(), payload: z.record(z.unknown()).optional() }).parse(claimed);
+    if (!claim.ok || !claim.id || !claim.payload) throw new Error(claim.reason ?? "Retry unavailable");
+    const r = await telegramCall("sendMessage", claim.payload, claim.id);
+    return { ok: r.ok, message: r.ok ? "Message delivered" : r.description ?? "Retry failed" };
+  });
+
+export const adminResumeDeliveryAI = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { error } = await db.from("app_settings").delete().eq("key", "delivery_ai_paused");
+    if (error) throw new Error("Could not resume AI questions");
+    return { ok: true };
+  });
