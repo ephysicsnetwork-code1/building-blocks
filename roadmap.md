@@ -3,3 +3,5 @@
 - [x] Add admin notification history and dated registrations with username search.
 - [x] Collect gender on registration and allow admin profile updates without guessing existing genders.
 - [x] Verify signed-in admin views, profile saving, saved registrations, delivery tests, and existing parent rules; no unsolicited live bot message sent.
+- [x] Remove bright button fills behind icons and labels in the Security, Parents and admin login views so every action stays readable.
+- [ ] Publish, then redeploy on Vercel so the Broadcast tab, records pages and icon fixes reach the live site.
