@@ -1,4 +1,5 @@
 import { NotificationHistory, RegistrationHistory } from "./AdminRecords";
+import { BroadcastPanel } from "./AdminBroadcast";
 import { matchesAdminSearch } from "@/lib/admin-record-rules";
 import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState } from "react";
@@ -60,7 +61,7 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (t
   );
 }
 
-type View = "security" | "parents" | "students" | "teachers" | "registrations" | "notifications" | "settings";
+type View = "security" | "parents" | "students" | "teachers" | "registrations" | "notifications" | "broadcast" | "settings";
 
 function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
   const get = useServerFn(adminGetData);
@@ -116,7 +117,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         <Stat label="Locked names" value={banned.length} />
       </div>
       <div className="mt-5 flex gap-2 overflow-x-auto">
-        {(["security", "parents", "students", "teachers", "registrations", "notifications", "settings"] as View[]).map((v) => (
+        {(["security", "parents", "students", "teachers", "registrations", "notifications", "broadcast", "settings"] as View[]).map((v) => (
           <Button key={v} variant={view === v ? "default" : "outline"} onClick={() => { setView(v); setQ(""); }} className="shrink-0 whitespace-nowrap text-sm capitalize">{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</Button>
         ))}
       </div>
@@ -131,6 +132,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
       <div className="mt-4">
         {view === "registrations" && <RegistrationHistory token={token} />}
         {view === "notifications" && <NotificationHistory token={token} />}
+        {view === "broadcast" && <BroadcastPanel token={token} />}
         {(view === "parents" || view === "teachers") && <input className="field mb-3" aria-label="Search admin records" placeholder="Search name or Telegram username…" value={q} onChange={(e) => setQ(e.target.value)} />}
         {view === "security" && (
           <div className="space-y-5">
@@ -207,9 +209,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <td className="p-2">{j?.telegram_handle ?? "—"}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-3">
-                        <Button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></Button>
-                        <Button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></Button>
-                        {j && <Button className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></Button>}
+                        <Button variant="ghost" size="icon" className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></Button>
+                        <Button variant="ghost" size="icon" className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></Button>
+                        {j && <Button variant="ghost" size="icon" className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></Button>}
                       </div>
                     </td>
                   </tr>
@@ -234,8 +236,8 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <td className="p-2">{a ? `${a.telegram_handle} · ${new Date(a.accessed_at).toLocaleDateString()}` : "—"}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-3">
-                      <Button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></Button>
-                      <Button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></Button>
+                      <Button variant="ghost" size="icon" className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></Button>
                     </div>
                   </td>
                 </tr>

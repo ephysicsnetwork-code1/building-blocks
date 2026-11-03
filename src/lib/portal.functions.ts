@@ -458,3 +458,36 @@ export const adminGetNotificationDeliveries = createServerFn({ method: "POST" })
     if (error) throw new Error("Could not load delivery history");
     return { rows: rows ?? [], count: count ?? 0, totals };
   });
+
+export const adminBotStats = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const [{ count: total }, { count: today }, { data: latest }] = await Promise.all([
+      db.from("telegram_users").select("chat_id", { count: "exact", head: true }),
+      db.from("telegram_users").select("chat_id", { count: "exact", head: true }).gte("first_seen", since),
+      db.from("telegram_users").select("first_name,username,first_seen").order("first_seen", { ascending: false }).limit(5),
+    ]);
+    return { total: total ?? 0, today: today ?? 0, latest: latest ?? [] };
+  });
+
+export const adminBroadcast = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ text: z.string().trim().min(1).max(4000), withButton: z.boolean().default(true) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { data: users, error } = await db.from("telegram_users").select("chat_id");
+    if (error) throw new Error("Could not load bot users");
+    const reply_markup = data.withButton ? { inline_keyboard: [[{ text: "Open verification portal", web_app: { url: "https://bhsss-verifications.vercel.app/" } }]] } : undefined;
+    let sent = 0, failed = 0;
+    const list = users ?? [];
+    for (let i = 0; i < list.length; i += 10) {
+      const results = await Promise.all(list.slice(i, i + 10).map((u) =>
+        telegramCall("sendMessage", { chat_id: u.chat_id, text: data.text, ...(reply_markup ? { reply_markup } : {}) }).then((r) => r.ok).catch(() => false)));
+      for (const ok of results) ok ? sent++ : failed++;
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    return { sent, failed, total: list.length };
+  });
