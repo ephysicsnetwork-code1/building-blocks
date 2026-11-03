@@ -3,7 +3,3 @@
 - [x] Add admin notification history and dated registrations with username search.
 - [x] Collect gender on registration and allow admin profile updates without guessing existing genders.
 - [x] Verify signed-in admin views, profile saving, saved registrations, delivery tests, and existing parent rules; no unsolicited live bot message sent.
-- [ ] Brighten icon controls and navigation contrast.
-- [ ] Add authenticated AI questions grounded in notification recipients and failures.
-- [ ] Add retry eligibility, atomic duplicate protection, and admin retry controls.
-- [ ] Verify AI answers, retry safeguards, and admin rendering.

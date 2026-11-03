@@ -69,9 +69,6 @@ export type Database = {
           error_message: string | null
           id: string
           notification_id: string
-          retry_after: string | null
-          retry_of: string | null
-          retryable: boolean
           status: string
           telegram_handle: string | null
           telegram_message_id: number | null
@@ -85,9 +82,6 @@ export type Database = {
           error_message?: string | null
           id?: string
           notification_id: string
-          retry_after?: string | null
-          retry_of?: string | null
-          retryable?: boolean
           status?: string
           telegram_handle?: string | null
           telegram_message_id?: number | null
@@ -101,9 +95,6 @@ export type Database = {
           error_message?: string | null
           id?: string
           notification_id?: string
-          retry_after?: string | null
-          retry_of?: string | null
-          retryable?: boolean
           status?: string
           telegram_handle?: string | null
           telegram_message_id?: number | null
@@ -116,13 +107,6 @@ export type Database = {
             referencedRelation: "bot_notifications"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "bot_deliveries_retry_of_fkey"
-            columns: ["retry_of"]
-            isOneToOne: false
-            referencedRelation: "bot_deliveries"
-            referencedColumns: ["id"]
-          },
         ]
       }
       bot_notifications: {
@@ -132,7 +116,6 @@ export type Database = {
           id: string
           last_sent_at: string
           message: string
-          payload: Json | null
         }
         Insert: {
           content_key: string
@@ -140,7 +123,6 @@ export type Database = {
           id?: string
           last_sent_at?: string
           message: string
-          payload?: Json | null
         }
         Update: {
           content_key?: string
@@ -148,7 +130,6 @@ export type Database = {
           id?: string
           last_sent_at?: string
           message?: string
-          payload?: Json | null
         }
         Relationships: []
       }
@@ -370,7 +351,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_bot_delivery_retry: { Args: { delivery_id: string }; Returns: Json }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
