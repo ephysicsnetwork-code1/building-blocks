@@ -51,7 +51,7 @@ function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (t
       <form onSubmit={submit} className="glass glow w-full max-w-sm space-y-4 rounded-2xl p-6" autoComplete="off">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-3 text-xl font-bold"><GlassIcon icon={ShieldCheck} size="sm" /> Admin login</h2>
-          <Button type="button" onClick={onClose} className="text-muted-foreground" aria-label="Close"><X size={18} /></Button>
+          <Button type="button" variant="ghost" size="icon" onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close"><X size={18} /></Button>
         </div>
         <input className="field" placeholder="Username" value={u} onChange={(e) => setU(e.target.value)} autoComplete="off" />
         <input className="field" type="password" placeholder="Password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" />
@@ -123,7 +123,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
       </div>
 
       {openAlerts.length > 0 && view !== "security" && (
-        <Button onClick={() => setView("security")} className="mt-4 flex w-full items-center gap-3 rounded-xl border border-warning/40 p-3 text-left text-sm">
+        <Button variant="ghost" onClick={() => setView("security")} className="mt-4 flex w-full items-center justify-start gap-3 rounded-xl border border-warning/40 p-3 text-left text-sm hover:bg-warning/10">
           <GlassIcon icon={ShieldAlert} size="sm" />
           <span>{openAlerts.length} security alert(s) need review</span>
         </Button>
@@ -143,7 +143,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <tr key={a.id} className={`border-t ${a.resolved ? "opacity-50" : ""}`}>
                     <td className="p-2 whitespace-nowrap text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</td>
                     <td className="p-2">{a.message}</td>
-                    <td className="p-2">{!a.resolved && <Button className="text-primary" onClick={() => run(() => resolve({ data: { token, id: a.id } }), "Marked as reviewed")}>Dismiss</Button>}</td>
+                    <td className="p-2">{!a.resolved && <Button variant="ghost" className="border border-border text-primary hover:bg-primary/10" onClick={() => run(() => resolve({ data: { token, id: a.id } }), "Marked as reviewed")}>Dismiss</Button>}</td>
                   </tr>
                 ))}
                 {data.alerts.length === 0 && <Empty cols={3} />}
@@ -158,7 +158,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <td className="p-2">{a.failed_count}</td>
                     <td className={`p-2 ${a.banned ? "text-destructive" : "text-warning"}`}>{a.banned ? "Locked" : "Watching"}</td>
                     <td className="p-2">
-                      <Button className="text-success" onClick={() => run(() => unban({ data: { token, subject: a.subject } }), a.banned ? "Unbanned & re-added" : "Attempts cleared")}>
+                      <Button variant="ghost" className="border border-border text-success hover:bg-success/10" onClick={() => run(() => unban({ data: { token, subject: a.subject } }), a.banned ? "Unbanned & re-added" : "Attempts cleared")}>
                         {a.banned ? "Unban / Re-add" : "Clear"}
                       </Button>
                     </td>
@@ -180,11 +180,11 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                 <td className="p-2 whitespace-nowrap">
                   {p.status === "pending" && (
                     <>
-                      <Button className="text-success" onClick={() => run(() => decide({ data: { token, id: p.id, status: "approved" } }).then((r) => { if (!r.messaged) toast.warning("Approval saved! Please remind the parent to open @BHSSS_Verification_bot and tap /start to receive their approval notification."); }), "Approved")}>Approve</Button>
-                      <Button className="ml-3 text-destructive" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</Button>
+                      <Button variant="ghost" className="border border-border text-success hover:bg-success/10" onClick={() => run(() => decide({ data: { token, id: p.id, status: "approved" } }).then((r) => { if (!r.messaged) toast.warning("Approval saved! Please remind the parent to open @BHSSS_Verification_bot and tap /start to receive their approval notification."); }), "Approved")}>Approve</Button>
+                      <Button variant="ghost" className="ml-3 border border-border text-destructive hover:bg-destructive/10" onClick={() => run(() => decide({ data: { token, id: p.id, status: "rejected" } }), "Rejected")}>Reject</Button>
                     </>
                   )}
-                  <Button className="ml-3 text-muted-foreground" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></Button>
+                  <Button variant="ghost" size="icon" className="ml-3 text-muted-foreground hover:text-destructive" aria-label="Delete" title="Delete" onClick={() => confirm(`Delete request from ${p.parent_name}?`) && run(() => delParent({ data: { token, id: p.id } }), "Request deleted")}><Trash2 size={15} /></Button>
                 </td>
               </tr>
             ))}
