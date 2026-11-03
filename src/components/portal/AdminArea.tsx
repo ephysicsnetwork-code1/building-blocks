@@ -207,9 +207,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                     <td className="p-2">{j?.telegram_handle ?? "—"}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-3">
-                        <Button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></Button>
-                        <Button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></Button>
-                        {j && <Button className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></Button>}
+                        <Button variant="ghost" size="icon" className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></Button>
+                        <Button variant="ghost" size="icon" className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></Button>
+                        {j && <Button variant="ghost" size="icon" className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></Button>}
                       </div>
                     </td>
                   </tr>
@@ -234,8 +234,8 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                   <td className="p-2">{a ? `${a.telegram_handle} · ${new Date(a.accessed_at).toLocaleDateString()}` : "—"}</td>
                   <td className="p-2">
                     <div className="flex items-center gap-3">
-                      <Button className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></Button>
-                      <Button className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></Button>
+                      <Button variant="ghost" size="icon" className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "teacher", oldName: t.name, name: t.name, grade: "", section: "", stream: "" })}><Pencil size={15} /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${t.name} from the staff list?`) && run(() => removeP({ data: { token, kind: "teacher", name: t.name } }), "Teacher removed")}><Trash2 size={15} /></Button>
                     </div>
                   </td>
                 </tr>
