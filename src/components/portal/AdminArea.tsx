@@ -7,9 +7,9 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
-  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson,
+  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson, adminUpdateStudentHandle,
 } from "@/lib/portal.functions";
-import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw, AtSign } from "lucide-react";
 import { GlassIcon } from "./GlassIcon";
 
 type Data = Awaited<ReturnType<typeof adminGetData>>;
@@ -75,7 +75,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const addP = useServerFn(adminAddPerson);
   const editP = useServerFn(adminEditPerson);
   const removeP = useServerFn(adminRemovePerson);
+  const saveHandle = useServerFn(adminUpdateStudentHandle);
   const [editing, setEditing] = useState<null | { kind: "student" | "teacher"; oldName?: string; name: string; grade: string; section: string; stream: string }>(null);
+  const [editingHandle, setEditingHandle] = useState<null | { name: string; handle: string }>(null);
   const [data, setData] = useState<Data | null>(null);
   const [view, setView] = useState<View>("security");
   const [settings, setSettings] = useState({ telegram_link: "", support_handle: "", notify_chat_id: "" });
