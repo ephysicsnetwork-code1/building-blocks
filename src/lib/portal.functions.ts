@@ -357,6 +357,17 @@ export const adminResetStudent = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminUpdateStudentHandle = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ name: z.string().min(2).max(120), handle }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { error } = await db.from("student_joins").update({ telegram_handle: data.handle }).eq("full_name", data.name);
+    if (error) throw new Error("Could not update username");
+    await db.from("portal_registrations").update({ telegram_handle: data.handle }).eq("kind", "student").eq("source_key", data.name);
+    return { ok: true };
+  });
+
 export const adminTestBot = createServerFn({ method: "POST" })
   .inputValidator((d) => tokenSchema.parse(d))
   .handler(async ({ data }) => {

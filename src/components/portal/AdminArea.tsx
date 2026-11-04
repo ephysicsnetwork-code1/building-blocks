@@ -7,9 +7,9 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
-  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson,
+  adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson, adminUpdateStudentHandle,
 } from "@/lib/portal.functions";
-import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw, AtSign } from "lucide-react";
 import { GlassIcon } from "./GlassIcon";
 
 type Data = Awaited<ReturnType<typeof adminGetData>>;
@@ -75,7 +75,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
   const addP = useServerFn(adminAddPerson);
   const editP = useServerFn(adminEditPerson);
   const removeP = useServerFn(adminRemovePerson);
+  const saveHandle = useServerFn(adminUpdateStudentHandle);
   const [editing, setEditing] = useState<null | { kind: "student" | "teacher"; oldName?: string; name: string; grade: string; section: string; stream: string }>(null);
+  const [editingHandle, setEditingHandle] = useState<null | { name: string; handle: string }>(null);
   const [data, setData] = useState<Data | null>(null);
   const [view, setView] = useState<View>("security");
   const [settings, setSettings] = useState({ telegram_link: "", support_handle: "", notify_chat_id: "" });
@@ -211,6 +213,7 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
                       <div className="flex items-center gap-3">
                         <Button variant="ghost" size="icon" className="text-primary" title="Edit" aria-label="Edit" onClick={() => setEditing({ kind: "student", oldName: s.name, name: s.name, grade: s.grade, section: s.section, stream: s.stream ?? "" })}><Pencil size={15} /></Button>
                         <Button variant="ghost" size="icon" className="text-destructive" title="Remove" aria-label="Remove" onClick={() => confirm(`Remove ${s.name} from the roster?`) && run(() => removeP({ data: { token, kind: "student", name: s.name } }), "Student removed")}><Trash2 size={15} /></Button>
+                        {j && <Button variant="ghost" size="icon" className="text-primary" title="Edit Telegram username" aria-label="Edit Telegram username" onClick={() => setEditingHandle({ name: s.name, handle: j.telegram_handle })}><AtSign size={15} /></Button>}
                         {j && <Button variant="ghost" size="icon" className="text-warning" title="Reset join status" aria-label="Reset" onClick={() => confirm(`Reset join status for ${s.name}?`) && run(() => resetS({ data: { token, name: s.name } }), "Status reset")}><RotateCcw size={15} /></Button>}
                       </div>
                     </td>
@@ -277,6 +280,27 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
               <div className="flex gap-2">
                 <Button type="submit" className="btn-glow flex-1" disabled={editing.name.trim().length < 3}>Save</Button>
                 <Button type="button" className="btn-ghost" onClick={() => setEditing(null)}>Cancel</Button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {editingHandle && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-background/70 p-4 backdrop-blur-sm" role="dialog" aria-modal>
+            <form
+              className="glass glow w-full max-w-sm space-y-3 rounded-2xl p-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const h = editingHandle;
+                run(() => saveHandle({ data: { token, name: h.name, handle: h.handle } }), "Username updated").then(() => setEditingHandle(null));
+              }}
+            >
+              <h3 className="text-lg font-bold">Edit Telegram username</h3>
+              <p className="text-sm text-muted-foreground">{editingHandle.name}</p>
+              <input className="field" placeholder="@username" value={editingHandle.handle} onChange={(e) => setEditingHandle({ ...editingHandle, handle: e.target.value })} />
+              <div className="flex gap-2">
+                <Button type="submit" className="btn-glow flex-1" disabled={editingHandle.handle.trim().length < 5}>Save</Button>
+                <Button type="button" className="btn-ghost" onClick={() => setEditingHandle(null)}>Cancel</Button>
               </div>
             </form>
           </div>
