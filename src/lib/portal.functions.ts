@@ -502,3 +502,73 @@ export const adminBroadcast = createServerFn({ method: "POST" })
     }
     return { sent, failed, total: list.length };
   });
+
+// ---------- Grade 12 exam portal testers ----------
+async function examTestState() {
+  const db = await getDb();
+  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at"]);
+  const m = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
+  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null };
+}
+
+async function ensureExamPicked() {
+  const st = await examTestState();
+  if (st.pickedAt || !st.deadline || Date.now() < new Date(st.deadline).getTime()) return st;
+  const db = await getDb();
+  const pickedAt = new Date().toISOString();
+  // Claim the pick once; a concurrent caller hitting the conflict skips.
+  const { error } = await db.from("app_settings").insert({ key: "exam_test_picked_at", value: pickedAt });
+  if (error) return examTestState();
+  const { pickTesters, selectionMessage } = await import("./exam-test-rules");
+  const { data: all } = await db.from("exam_testers").select("telegram_handle,full_name,section");
+  const picked = pickTesters(all ?? []);
+  for (const p of picked) {
+    await db.from("exam_testers").update({ selected: true }).eq("telegram_handle", p.telegram_handle);
+    const ok = await messageByHandle(p.telegram_handle, selectionMessage(p.full_name)).catch(() => false);
+    await db.from("exam_testers").update({ notified: ok }).eq("telegram_handle", p.telegram_handle);
+  }
+  return { ...st, pickedAt };
+}
+
+export const getExamTestStatus = createServerFn({ method: "GET" }).handler(async () => {
+  const st = await ensureExamPicked();
+  return { deadline: st.deadline, closed: !!st.pickedAt };
+});
+
+export const signupExamTester = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ name: z.string().trim().min(3).max(120), handle }).parse(d))
+  .handler(async ({ data }) => {
+    const st = await ensureExamPicked();
+    if (st.pickedAt) return { ok: false as const, reason: "closed" as const };
+    if (!st.deadline) return { ok: false as const, reason: "not_open" as const };
+    const db = await getDb();
+    const { data: joins } = await db.from("student_joins").select("full_name,section,telegram_handle").eq("grade", "12").ilike("telegram_handle", data.handle);
+    const { isTesterSection } = await import("./exam-test-rules");
+    const j = (joins ?? []).find((x) => normalizeName(x.full_name) === normalizeName(data.name));
+    if (!j) return { ok: false as const, reason: "not_registered" as const };
+    if (!isTesterSection(j.section)) return { ok: false as const, reason: "wrong_section" as const };
+    const { error } = await db.from("exam_testers").insert({ telegram_handle: j.telegram_handle, full_name: j.full_name, section: j.section });
+    if (error) return { ok: false as const, reason: "already" as const };
+    return { ok: true as const, name: j.full_name };
+  });
+
+export const adminExamTesters = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const st = await ensureExamPicked();
+    const db = await getDb();
+    const { data: rows } = await db.from("exam_testers").select("*").order("signed_up_at");
+    return { ...st, rows: rows ?? [] };
+  });
+
+export const adminSetExamDeadline = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ deadline: z.string().datetime() }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const st = await examTestState();
+    if (st.pickedAt) throw new Error("Testers were already picked");
+    const db = await getDb();
+    await db.from("app_settings").upsert({ key: "exam_test_deadline", value: data.deadline });
+    return { ok: true };
+  });
