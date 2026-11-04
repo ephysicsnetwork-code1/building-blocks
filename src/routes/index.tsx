@@ -6,9 +6,10 @@ import { getPublicSettings } from "@/lib/portal.functions";
 import { StudentFlow } from "@/components/portal/StudentFlow";
 import { TeacherFlow } from "@/components/portal/TeacherFlow";
 import { ParentFlow } from "@/components/portal/ParentFlow";
+import { ExamTestFlow } from "@/components/portal/ExamTestFlow";
 import { AdminArea } from "@/components/portal/AdminArea";
 import { GlassIcon } from "@/components/portal/GlassIcon";
-import { GraduationCap, Presentation, Users, ShieldCheck, type LucideIcon } from "lucide-react";
+import { ClipboardCheck, GraduationCap, Presentation, Users, ShieldCheck, type LucideIcon } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -24,11 +25,12 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Tab = "student" | "teacher" | "parent" | "admin";
+type Tab = "student" | "teacher" | "parent" | "examtest" | "admin";
 const TABS: { id: Tab; icon: LucideIcon; label: string; hint: string }[] = [
   { id: "student", icon: GraduationCap, label: "Students", hint: "Grade 9–12" },
   { id: "teacher", icon: Presentation, label: "Teachers", hint: "Staff roster" },
   { id: "parent", icon: Users, label: "Parents", hint: "Request access" },
+  { id: "examtest", icon: ClipboardCheck, label: "Exam test", hint: "Grade 12 only" },
   { id: "admin", icon: ShieldCheck, label: "Admin", hint: "Dashboard" },
 ];
 
@@ -38,6 +40,7 @@ function Index() {
   const [sections, setSections] = useState<Record<string, string[]>>({});
 
   useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "examtest") setTab("examtest");
     getPublicSettings().then((s) => { setSupport(s.support_handle); setSections(s.sections); }).catch(() => {});
   }, []);
 
@@ -59,7 +62,7 @@ function Index() {
         <p className="mt-2 text-sm text-muted-foreground">Official Verification Portal</p>
       </header>
 
-      <nav className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <nav className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -82,6 +85,7 @@ function Index() {
         {tab === "student" && <StudentFlow key="s" sections={sections} supportUrl={supportUrl} support={support} />}
         {tab === "teacher" && <TeacherFlow key="t" supportUrl={supportUrl} support={support} />}
         {tab === "parent" && <ParentFlow key="p" supportUrl={supportUrl} support={support} />}
+        {tab === "examtest" && <ExamTestFlow key="e" supportUrl={supportUrl} />}
         {tab === "admin" && <AdminArea key="a" onClose={() => setTab(null)} />}
       </main>
 

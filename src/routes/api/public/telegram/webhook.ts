@@ -4,7 +4,10 @@ import { PARENT_GROUP_LINK } from "@/lib/parent-rules";
 
 const PORTAL_URL = "https://bhsss-verifications.vercel.app/";
 const PORTAL_BUTTON = {
-  inline_keyboard: [[{ text: "Open verification portal", web_app: { url: PORTAL_URL } }]],
+  inline_keyboard: [
+    [{ text: "Open verification portal", web_app: { url: PORTAL_URL } }],
+    [{ text: "Grade 12: Test the exam portal", web_app: { url: `${PORTAL_URL}?tab=examtest` } }],
+  ],
 };
 
 function expectedSecret(token: string) {
