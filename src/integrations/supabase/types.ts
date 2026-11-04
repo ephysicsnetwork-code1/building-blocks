@@ -152,6 +152,33 @@ export type Database = {
         }
         Relationships: []
       }
+      exam_testers: {
+        Row: {
+          full_name: string
+          notified: boolean | null
+          section: string
+          selected: boolean
+          signed_up_at: string
+          telegram_handle: string
+        }
+        Insert: {
+          full_name: string
+          notified?: boolean | null
+          section: string
+          selected?: boolean
+          signed_up_at?: string
+          telegram_handle: string
+        }
+        Update: {
+          full_name?: string
+          notified?: boolean | null
+          section?: string
+          selected?: boolean
+          signed_up_at?: string
+          telegram_handle?: string
+        }
+        Relationships: []
+      }
       parent_requests: {
         Row: {
           created_at: string
