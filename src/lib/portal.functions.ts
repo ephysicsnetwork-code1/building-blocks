@@ -506,15 +506,15 @@ export const adminBroadcast = createServerFn({ method: "POST" })
 // ---------- Grade 12 exam portal testers ----------
 async function examTestState() {
   const db = await getDb();
-  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits"]);
+  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits", "exam_test_mode"]);
   const { parseBenefits } = await import("./exam-test-rules");
   const m = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
-  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined) };
+  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined), mode: ((m["exam_test_mode"] as string | undefined) || "auto") as "auto" | "open" | "closed" };
 }
 
 async function ensureExamPicked() {
   const st = await examTestState();
-  if (st.pickedAt || !st.deadline || Date.now() < new Date(st.deadline).getTime()) return st;
+  if (st.mode !== "auto" || st.pickedAt || !st.deadline || Date.now() < new Date(st.deadline).getTime()) return st;
   const db = await getDb();
   const pickedAt = new Date().toISOString();
   // Claim the pick once; a concurrent caller hitting the conflict skips.
@@ -533,15 +533,15 @@ async function ensureExamPicked() {
 
 export const getExamTestStatus = createServerFn({ method: "GET" }).handler(async () => {
   const st = await ensureExamPicked();
-  return { deadline: st.deadline, closed: !!st.pickedAt, benefits: st.benefits };
+  return { deadline: st.mode === "auto" ? st.deadline : null, closed: !!st.pickedAt || st.mode === "closed", open: st.mode === "open" || (st.mode === "auto" && !!st.deadline), benefits: st.benefits };
 });
 
 export const signupExamTester = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ name: z.string().trim().min(3).max(120), handle }).parse(d))
   .handler(async ({ data }) => {
     const st = await ensureExamPicked();
-    if (st.pickedAt) return { ok: false as const, reason: "closed" as const };
-    if (!st.deadline) return { ok: false as const, reason: "not_open" as const };
+    if (st.pickedAt || st.mode === "closed") return { ok: false as const, reason: "closed" as const };
+    if (st.mode === "auto" && !st.deadline) return { ok: false as const, reason: "not_open" as const };
     const db = await getDb();
     const { data: joins } = await db.from("student_joins").select("full_name,section,telegram_handle").eq("grade", "12").ilike("telegram_handle", data.handle);
     const { isTesterSection } = await import("./exam-test-rules");
@@ -567,8 +567,6 @@ export const adminSetExamDeadline = createServerFn({ method: "POST" })
   .inputValidator((d) => tokenSchema.extend({ deadline: z.string().datetime() }).parse(d))
   .handler(async ({ data }) => {
     assertAdmin(data.token);
-    const st = await examTestState();
-    if (st.pickedAt) throw new Error("Testers were already picked");
     const db = await getDb();
     await db.from("app_settings").upsert({ key: "exam_test_deadline", value: data.deadline });
     return { ok: true };
@@ -581,5 +579,34 @@ export const adminSetExamBenefits = createServerFn({ method: "POST" })
     const db = await getDb();
     const { error } = await db.from("app_settings").upsert({ key: "exam_test_benefits", value: data.benefits.join("\n") });
     if (error) throw new Error("Could not save benefits");
+    return { ok: true };
+  });
+
+export const adminSetExamMode = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ mode: z.enum(["auto", "open", "closed"]) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    await db.from("app_settings").upsert({ key: "exam_test_mode", value: data.mode });
+    return { ok: true };
+  });
+
+export const adminRemoveExamTester = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ handle: z.string().min(2).max(40) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    await db.from("exam_testers").delete().eq("telegram_handle", data.handle);
+    return { ok: true };
+  });
+
+/** Clears the previous pick so a new deadline can pick again; sign-ups are kept. */
+export const adminResetExamPick = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    await db.from("exam_testers").update({ selected: false, notified: null }).eq("selected", true);
+    await db.from("app_settings").delete().eq("key", "exam_test_picked_at");
     return { ok: true };
   });
