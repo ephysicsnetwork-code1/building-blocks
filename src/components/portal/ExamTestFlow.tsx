@@ -26,8 +26,8 @@ export function ExamTestFlow({ supportUrl }: { supportUrl: string }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (name.trim().length < 3) return toast.error("Enter your full name");
-    if (!HANDLE_RE.test(handle.trim())) return toast.error("Enter a valid Telegram username");
+    if (name.trim().length < 3) { toast.error("Enter your full name"); return; }
+    if (!HANDLE_RE.test(handle.trim())) { toast.error("Enter a valid Telegram username"); return; }
     setBusy(true);
     try {
       const r = await signup({ data: { name, handle } });
