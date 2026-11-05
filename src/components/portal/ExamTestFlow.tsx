@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { HANDLE_RE } from "@/lib/school-constants";
 import { getExamTestStatus, signupExamTester } from "@/lib/portal.functions";
-import { TESTER_BENEFITS, TOTAL_TESTERS } from "@/lib/exam-test-rules";
+import { TOTAL_TESTERS } from "@/lib/exam-test-rules";
 
 const REASONS: Record<string, string> = {
   not_registered: "We couldn't find you. Only Grade 12 students who already joined through the bot can sign up — use the same name and Telegram username you joined with.",
@@ -16,13 +16,13 @@ const REASONS: Record<string, string> = {
 export function ExamTestFlow({ supportUrl }: { supportUrl: string }) {
   const status = useServerFn(getExamTestStatus);
   const signup = useServerFn(signupExamTester);
-  const [st, setSt] = useState<{ deadline: string | null; closed: boolean } | null>(null);
+  const [st, setSt] = useState<{ deadline: string | null; closed: boolean; benefits: string[] } | null>(null);
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
 
-  useEffect(() => { status().then(setSt).catch(() => setSt({ deadline: null, closed: false })); }, [status]);
+  useEffect(() => { status().then(setSt).catch(() => setSt({ deadline: null, closed: false, benefits: [] })); }, [status]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,7 +46,7 @@ export function ExamTestFlow({ supportUrl }: { supportUrl: string }) {
       </p>
       <div className="rounded-xl border p-3 text-sm">
         <div className="font-semibold">What you get</div>
-        <ul className="mt-1 list-disc pl-5 text-muted-foreground">{TESTER_BENEFITS.map((b) => <li key={b}>{b}</li>)}</ul>
+        <ul className="mt-1 list-disc pl-5 text-muted-foreground">{(st?.benefits ?? []).map((b) => <li key={b}>{b}</li>)}</ul>
       </div>
       {!st ? <p className="text-muted-foreground">Loading…</p>
         : st.closed ? <p className="font-semibold">{REASONS["closed"]}</p>

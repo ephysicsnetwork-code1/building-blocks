@@ -23,6 +23,11 @@ export function pickTesters<T extends { section: string }>(list: T[], rng: () =>
   return out;
 }
 
-export function selectionMessage(name: string) {
-  return `🎉 Congratulations ${name}! You have been picked as one of the ${TOTAL_TESTERS} Grade 12 students to test the new exam portal.\n\nWhat you get:\n${TESTER_BENEFITS.map((b) => `• ${b}`).join("\n")}\n\nOpen the exam portal: ${EXAM_PORTAL_URL}`;
+export function parseBenefits(v: string | null | undefined): string[] {
+  const list = (v ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+  return list.length ? list : TESTER_BENEFITS;
+}
+
+export function selectionMessage(name: string, benefits: string[] = TESTER_BENEFITS) {
+  return `🎉 Congratulations ${name}! You have been picked as one of the ${TOTAL_TESTERS} Grade 12 students to test the new exam portal.\n\nWhat you get:\n${benefits.map((b) => `• ${b}`).join("\n")}\n\nOpen the exam portal: ${EXAM_PORTAL_URL}`;
 }
