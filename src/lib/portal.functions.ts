@@ -506,9 +506,10 @@ export const adminBroadcast = createServerFn({ method: "POST" })
 // ---------- Grade 12 exam portal testers ----------
 async function examTestState() {
   const db = await getDb();
-  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at"]);
+  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits"]);
+  const { parseBenefits } = await import("./exam-test-rules");
   const m = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
-  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null };
+  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined) };
 }
 
 async function ensureExamPicked() {
@@ -524,7 +525,7 @@ async function ensureExamPicked() {
   const picked = pickTesters(all ?? []);
   for (const p of picked) {
     await db.from("exam_testers").update({ selected: true }).eq("telegram_handle", p.telegram_handle);
-    const ok = await messageByHandle(p.telegram_handle, selectionMessage(p.full_name)).catch(() => false);
+    const ok = await messageByHandle(p.telegram_handle, selectionMessage(p.full_name, st.benefits)).catch(() => false);
     await db.from("exam_testers").update({ notified: ok }).eq("telegram_handle", p.telegram_handle);
   }
   return { ...st, pickedAt };
@@ -532,7 +533,7 @@ async function ensureExamPicked() {
 
 export const getExamTestStatus = createServerFn({ method: "GET" }).handler(async () => {
   const st = await ensureExamPicked();
-  return { deadline: st.deadline, closed: !!st.pickedAt };
+  return { deadline: st.deadline, closed: !!st.pickedAt, benefits: st.benefits };
 });
 
 export const signupExamTester = createServerFn({ method: "POST" })
@@ -570,5 +571,15 @@ export const adminSetExamDeadline = createServerFn({ method: "POST" })
     if (st.pickedAt) throw new Error("Testers were already picked");
     const db = await getDb();
     await db.from("app_settings").upsert({ key: "exam_test_deadline", value: data.deadline });
+    return { ok: true };
+  });
+
+export const adminSetExamBenefits = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ benefits: z.array(z.string().trim().min(1).max(200)).min(1).max(10) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const { error } = await db.from("app_settings").upsert({ key: "exam_test_benefits", value: data.benefits.join("\n") });
+    if (error) throw new Error("Could not save benefits");
     return { ok: true };
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickTesters } from "@/lib/exam-test-rules";
+import { pickTesters, parseBenefits, selectionMessage, TESTER_BENEFITS } from "@/lib/exam-test-rules";
 
 const mk = (section: string, n: number) => Array.from({ length: n }, (_, i) => ({ section, name: `${section}${i}` }));
 
@@ -17,5 +17,16 @@ describe("pickTesters", () => {
   });
   it("ignores other sections", () => {
     expect(pickTesters(mk("D", 4)).length).toBe(0);
+  });
+});
+
+describe("benefits", () => {
+  it("uses admin-edited benefits in the selection message", () => {
+    const b = parseBenefits("Free snacks\n\n Certificate ");
+    expect(b).toEqual(["Free snacks", "Certificate"]);
+    expect(selectionMessage("Abebe", b)).toContain("• Free snacks\n• Certificate");
+  });
+  it("falls back to defaults when nothing is saved", () => {
+    expect(parseBenefits(null)).toEqual(TESTER_BENEFITS);
   });
 });

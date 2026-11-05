@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { adminExamTesters, adminSetExamDeadline } from "@/lib/portal.functions";
+import { adminExamTesters, adminSetExamDeadline, adminSetExamBenefits } from "@/lib/portal.functions";
 
 type Data = Awaited<ReturnType<typeof adminExamTesters>>;
 
@@ -11,6 +11,8 @@ export function ExamTestPanel({ token }: { token: string }) {
   const setDl = useServerFn(adminSetExamDeadline);
   const [d, setD] = useState<Data | null>(null);
   const [local, setLocal] = useState("");
+  const setBen = useServerFn(adminSetExamBenefits);
+  const [ben, setBenText] = useState<string | null>(null);
   const load = useCallback(() => get({ data: { token } }).then(setD).catch(() => toast.error("Could not load")), [get, token]);
   useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [load]);
   if (!d) return <p className="text-muted-foreground">Loading…</p>;
@@ -31,6 +33,17 @@ export function ExamTestPanel({ token }: { token: string }) {
             }}>Save deadline</Button>
           </div>
         )}
+      </div>
+      <div className="rounded-xl border p-4 text-sm">
+        <label className="font-semibold" htmlFor="benefits">Benefits (one per line)</label>
+        <p className="text-xs text-muted-foreground">Shown on the sign-up page and in the message picked students receive.</p>
+        <textarea id="benefits" className="field mt-2 min-h-28" value={ben ?? d.benefits.join("\n")} onChange={(e) => setBenText(e.target.value)} />
+        <Button className="btn-glow mt-2" disabled={ben === null} onClick={async () => {
+          const list = (ben ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+          if (!list.length) { toast.error("Add at least one benefit"); return; }
+          try { await setBen({ data: { token, benefits: list } }); toast.success("Benefits saved"); setBenText(null); load(); }
+          catch { toast.error("Each benefit must be under 200 characters, max 10"); }
+        }}>Save benefits</Button>
       </div>
       {d.pickedAt && (
         <div>
