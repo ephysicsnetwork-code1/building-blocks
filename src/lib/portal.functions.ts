@@ -487,15 +487,25 @@ export const adminBotStats = createServerFn({ method: "POST" })
   });
 
 export const adminBroadcast = createServerFn({ method: "POST" })
-  .inputValidator((d) => tokenSchema.extend({ text: z.string().trim().min(1).max(4000), withButton: z.boolean().default(true) }).parse(d))
+  .inputValidator((d) =>
+    tokenSchema
+      .extend({ text: z.string().trim().min(1).max(4000), withButton: z.boolean().default(true), handles: z.array(handle).max(200).optional() })
+      .parse(d),
+  )
   .handler(async ({ data }) => {
     assertAdmin(data.token);
     const db = await getDb();
-    const { data: users, error } = await db.from("telegram_users").select("chat_id");
+    const { data: users, error } = await db.from("telegram_users").select("chat_id,username");
     if (error) throw new Error("Could not load bot users");
+    let list = users ?? [];
+    let notFound: string[] = [];
+    if (data.handles?.length) {
+      const wanted = new Map(data.handles.map((h) => [h.replace(/^@/, "").toLowerCase(), h]));
+      list = list.filter((u) => u.username && wanted.delete(u.username.toLowerCase()));
+      notFound = [...wanted.values()];
+    }
     const reply_markup = data.withButton ? { inline_keyboard: [[{ text: "Open verification portal", web_app: { url: "https://bhsss-verifications.vercel.app/" } }]] } : undefined;
     let sent = 0, failed = 0;
-    const list = users ?? [];
     for (let i = 0; i < list.length; i += 10) {
       const results = await Promise.all(list.slice(i, i + 10).map((u) =>
         telegramCall("sendMessage", { chat_id: u.chat_id, text: data.text, ...(reply_markup ? { reply_markup } : {}) }).then((r) => r.ok).catch(() => false)));
@@ -591,6 +601,40 @@ export const adminSetExamMode = createServerFn({ method: "POST" })
     const db = await getDb();
     await db.from("app_settings").upsert({ key: "exam_test_mode", value: data.mode });
     return { ok: true };
+  });
+
+export const adminSetExamVisible = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ visible: z.boolean() }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    await db.from("app_settings").upsert({ key: "exam_test_visible", value: data.visible ? "1" : "0" });
+    return { ok: true };
+  });
+
+/** Manually picks the given sign-ups and sends each one the selection message. */
+export const adminPickExamTesters = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ handles: z.array(z.string().trim().min(2).max(40)).min(1).max(50) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const st = await examTestState();
+    if (st.pickedAt) throw new Error("Students were already picked. Reset the pick first.");
+    // Claim the pick once; a concurrent caller hitting the conflict skips.
+    const { error } = await db.from("app_settings").insert({ key: "exam_test_picked_at", value: new Date().toISOString() });
+    if (error) throw new Error("Students were already picked. Reset the pick first.");
+    const wanted = new Set(data.handles.map((h) => normalizeHandle(h).toLowerCase()));
+    const { data: all } = await db.from("exam_testers").select("telegram_handle,full_name");
+    const picked = (all ?? []).filter((r) => wanted.has(r.telegram_handle.toLowerCase()));
+    const { selectionMessage } = await import("./exam-test-rules");
+    let sent = 0, failed = 0;
+    for (const p of picked) {
+      await db.from("exam_testers").update({ selected: true }).eq("telegram_handle", p.telegram_handle);
+      const ok = await messageByHandle(p.telegram_handle, selectionMessage(p.full_name, st.benefits)).catch(() => false);
+      await db.from("exam_testers").update({ notified: ok }).eq("telegram_handle", p.telegram_handle);
+      ok ? sent++ : failed++;
+    }
+    return { ok: true as const, picked: picked.length, sent, failed };
   });
 
 export const adminRemoveExamTester = createServerFn({ method: "POST" })
