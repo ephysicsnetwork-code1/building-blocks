@@ -47,7 +47,9 @@ async function notify(text: string) {
 
 export const getPublicSettings = createServerFn({ method: "GET" }).handler(async () => {
   const s = await getSettings();
-  return { support_handle: s.support_handle, sections: await rosterSections() };
+  const db = await getDb();
+  const { data: vis } = await db.from("app_settings").select("value").eq("key", "exam_test_visible").maybeSingle();
+  return { support_handle: s.support_handle, sections: await rosterSections(), exam_test_visible: vis?.value !== "0" };
 });
 
 export const verifyStudent = createServerFn({ method: "POST" })
@@ -506,10 +508,10 @@ export const adminBroadcast = createServerFn({ method: "POST" })
 // ---------- Grade 12 exam portal testers ----------
 async function examTestState() {
   const db = await getDb();
-  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits", "exam_test_mode"]);
+  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits", "exam_test_mode", "exam_test_visible"]);
   const { parseBenefits } = await import("./exam-test-rules");
   const m = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
-  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined), mode: ((m["exam_test_mode"] as string | undefined) || "auto") as "auto" | "open" | "closed" };
+  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined), mode: ((m["exam_test_mode"] as string | undefined) || "auto") as "auto" | "open" | "closed", visible: (m["exam_test_visible"] as string | undefined) !== "0" };
 }
 
 async function ensureExamPicked() {
@@ -533,7 +535,7 @@ async function ensureExamPicked() {
 
 export const getExamTestStatus = createServerFn({ method: "GET" }).handler(async () => {
   const st = await ensureExamPicked();
-  return { deadline: st.mode === "auto" ? st.deadline : null, closed: !!st.pickedAt || st.mode === "closed", open: st.mode === "open" || (st.mode === "auto" && !!st.deadline), benefits: st.benefits };
+  return { deadline: st.mode === "auto" ? st.deadline : null, closed: !!st.pickedAt || st.mode === "closed", open: st.mode === "open" || (st.mode === "auto" && !!st.deadline), benefits: st.benefits, visible: st.visible };
 });
 
 export const signupExamTester = createServerFn({ method: "POST" })
