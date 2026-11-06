@@ -13,6 +13,8 @@ export function BroadcastPanel({ token }: { token: string }) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [text, setText] = useState("");
   const [withButton, setWithButton] = useState(true);
+  const [target, setTarget] = useState<"all" | "some">("all");
+  const [handlesText, setHandlesText] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -42,19 +44,28 @@ export function BroadcastPanel({ token }: { token: string }) {
     </div>}
     <form className="space-y-3" onSubmit={async (e) => {
       e.preventDefault();
-      if (!confirm(`Send this message to all ${stats?.total ?? ""} bot users?`)) return;
+      const handles = handlesText.split(/[\s,]+/).map((h) => h.trim()).filter(Boolean);
+      if (target === "some" && !handles.length) { toast.error("Add at least one Telegram username"); return; }
+      if (!confirm(target === "all" ? `Send this message to all ${stats?.total ?? ""} bot users?` : `Send this message privately to ${handles.length} chosen user(s)?`)) return;
       setBusy(true);
       try {
-        const r = await send({ data: { token, text, withButton } });
-        toast.success(`Sent to ${r.sent} of ${r.total} users${r.failed ? ` · ${r.failed} failed or blocked` : ""}`);
+        const r = await send({ data: { token, text, withButton, ...(target === "some" ? { handles } : {}) } });
+        toast.success(`Sent to ${r.sent} of ${r.total} users${r.failed ? ` · ${r.failed} failed or blocked` : ""}${r.notFound?.length ? ` · ${r.notFound.length} not found (never pressed /start): ${r.notFound.join(", ")}` : ""}`, { duration: 8000 });
         setText("");
       } catch { toast.error("Could not send the message"); } finally { setBusy(false); }
     }}>
-      <h3 className="font-semibold">Message all bot users</h3>
+      <h3 className="font-semibold">Message bot users</h3>
+      <div className="inline-flex gap-1 rounded-xl border p-1">
+        <Button type="button" size="sm" variant={target === "all" ? "default" : "ghost"} onClick={() => setTarget("all")}>Everyone</Button>
+        <Button type="button" size="sm" variant={target === "some" ? "default" : "ghost"} onClick={() => setTarget("some")}>Chosen users</Button>
+      </div>
+      {target === "some" && (
+        <textarea className="field min-h-20" aria-label="Telegram usernames" placeholder={"Telegram usernames, separated by commas or new lines\nExample: @user1, @user2"} value={handlesText} onChange={(e) => setHandlesText(e.target.value)} />
+      )}
       <textarea className="field min-h-32" aria-label="Message" placeholder="Write your message…" maxLength={4000} value={text} onChange={(e) => setText(e.target.value)} />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={withButton} onChange={(e) => setWithButton(e.target.checked)} /> Add "Open verification portal" button</label>
-      <Button type="submit" className="btn-glow" disabled={busy || !text.trim()}><Send size={16} /> {busy ? "Sending… keep this open" : "Send to everyone"}</Button>
-      <p className="text-xs text-muted-foreground">Results appear in the Notifications tab.</p>
+      <Button type="submit" className="btn-glow" disabled={busy || !text.trim()}><Send size={16} /> {busy ? "Sending… keep this open" : target === "all" ? "Send to everyone" : "Send privately"}</Button>
+      <p className="text-xs text-muted-foreground">{target === "some" ? "Only users who have pressed /start in the bot can be reached." : "Results appear in the Notifications tab."}</p>
     </form>
   </section>;
 }

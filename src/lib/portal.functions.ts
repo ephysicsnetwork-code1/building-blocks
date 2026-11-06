@@ -47,7 +47,9 @@ async function notify(text: string) {
 
 export const getPublicSettings = createServerFn({ method: "GET" }).handler(async () => {
   const s = await getSettings();
-  return { support_handle: s.support_handle, sections: await rosterSections() };
+  const db = await getDb();
+  const { data: vis } = await db.from("app_settings").select("value").eq("key", "exam_test_visible").maybeSingle();
+  return { support_handle: s.support_handle, sections: await rosterSections(), exam_test_visible: vis?.value !== "0" };
 });
 
 export const verifyStudent = createServerFn({ method: "POST" })
@@ -485,31 +487,41 @@ export const adminBotStats = createServerFn({ method: "POST" })
   });
 
 export const adminBroadcast = createServerFn({ method: "POST" })
-  .inputValidator((d) => tokenSchema.extend({ text: z.string().trim().min(1).max(4000), withButton: z.boolean().default(true) }).parse(d))
+  .inputValidator((d) =>
+    tokenSchema
+      .extend({ text: z.string().trim().min(1).max(4000), withButton: z.boolean().default(true), handles: z.array(handle).max(200).optional() })
+      .parse(d),
+  )
   .handler(async ({ data }) => {
     assertAdmin(data.token);
     const db = await getDb();
-    const { data: users, error } = await db.from("telegram_users").select("chat_id");
+    const { data: users, error } = await db.from("telegram_users").select("chat_id,username");
     if (error) throw new Error("Could not load bot users");
+    let list = users ?? [];
+    let notFound: string[] = [];
+    if (data.handles?.length) {
+      const wanted = new Map(data.handles.map((h) => [h.replace(/^@/, "").toLowerCase(), h]));
+      list = list.filter((u) => u.username && wanted.delete(u.username.toLowerCase()));
+      notFound = [...wanted.values()];
+    }
     const reply_markup = data.withButton ? { inline_keyboard: [[{ text: "Open verification portal", web_app: { url: "https://bhsss-verifications.vercel.app/" } }]] } : undefined;
     let sent = 0, failed = 0;
-    const list = users ?? [];
     for (let i = 0; i < list.length; i += 10) {
       const results = await Promise.all(list.slice(i, i + 10).map((u) =>
         telegramCall("sendMessage", { chat_id: u.chat_id, text: data.text, ...(reply_markup ? { reply_markup } : {}) }).then((r) => r.ok).catch(() => false)));
       for (const ok of results) ok ? sent++ : failed++;
       await new Promise((r) => setTimeout(r, 400));
     }
-    return { sent, failed, total: list.length };
+    return { sent, failed, total: list.length, notFound };
   });
 
 // ---------- Grade 12 exam portal testers ----------
 async function examTestState() {
   const db = await getDb();
-  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits", "exam_test_mode"]);
+  const { data } = await db.from("app_settings").select("key,value").in("key", ["exam_test_deadline", "exam_test_picked_at", "exam_test_benefits", "exam_test_mode", "exam_test_visible"]);
   const { parseBenefits } = await import("./exam-test-rules");
   const m = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
-  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined), mode: ((m["exam_test_mode"] as string | undefined) || "auto") as "auto" | "open" | "closed" };
+  return { deadline: (m["exam_test_deadline"] as string | undefined) || null, pickedAt: (m["exam_test_picked_at"] as string | undefined) || null, benefits: parseBenefits(m["exam_test_benefits"] as string | undefined), mode: ((m["exam_test_mode"] as string | undefined) || "auto") as "auto" | "open" | "closed", visible: (m["exam_test_visible"] as string | undefined) !== "0" };
 }
 
 async function ensureExamPicked() {
@@ -533,7 +545,7 @@ async function ensureExamPicked() {
 
 export const getExamTestStatus = createServerFn({ method: "GET" }).handler(async () => {
   const st = await ensureExamPicked();
-  return { deadline: st.mode === "auto" ? st.deadline : null, closed: !!st.pickedAt || st.mode === "closed", open: st.mode === "open" || (st.mode === "auto" && !!st.deadline), benefits: st.benefits };
+  return { deadline: st.mode === "auto" ? st.deadline : null, closed: !!st.pickedAt || st.mode === "closed", open: st.mode === "open" || (st.mode === "auto" && !!st.deadline), benefits: st.benefits, visible: st.visible };
 });
 
 export const signupExamTester = createServerFn({ method: "POST" })
@@ -589,6 +601,40 @@ export const adminSetExamMode = createServerFn({ method: "POST" })
     const db = await getDb();
     await db.from("app_settings").upsert({ key: "exam_test_mode", value: data.mode });
     return { ok: true };
+  });
+
+export const adminSetExamVisible = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ visible: z.boolean() }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    await db.from("app_settings").upsert({ key: "exam_test_visible", value: data.visible ? "1" : "0" });
+    return { ok: true };
+  });
+
+/** Manually picks the given sign-ups and sends each one the selection message. */
+export const adminPickExamTesters = createServerFn({ method: "POST" })
+  .inputValidator((d) => tokenSchema.extend({ handles: z.array(z.string().trim().min(2).max(40)).min(1).max(50) }).parse(d))
+  .handler(async ({ data }) => {
+    assertAdmin(data.token);
+    const db = await getDb();
+    const st = await examTestState();
+    if (st.pickedAt) throw new Error("Students were already picked. Reset the pick first.");
+    // Claim the pick once; a concurrent caller hitting the conflict skips.
+    const { error } = await db.from("app_settings").insert({ key: "exam_test_picked_at", value: new Date().toISOString() });
+    if (error) throw new Error("Students were already picked. Reset the pick first.");
+    const wanted = new Set(data.handles.map((h) => normalizeHandle(h).toLowerCase()));
+    const { data: all } = await db.from("exam_testers").select("telegram_handle,full_name");
+    const picked = (all ?? []).filter((r) => wanted.has(r.telegram_handle.toLowerCase()));
+    const { selectionMessage } = await import("./exam-test-rules");
+    let sent = 0, failed = 0;
+    for (const p of picked) {
+      await db.from("exam_testers").update({ selected: true }).eq("telegram_handle", p.telegram_handle);
+      const ok = await messageByHandle(p.telegram_handle, selectionMessage(p.full_name, st.benefits)).catch(() => false);
+      await db.from("exam_testers").update({ notified: ok }).eq("telegram_handle", p.telegram_handle);
+      ok ? sent++ : failed++;
+    }
+    return { ok: true as const, picked: picked.length, sent, failed };
   });
 
 export const adminRemoveExamTester = createServerFn({ method: "POST" })
