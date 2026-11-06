@@ -10,7 +10,9 @@ import {
   adminLogin, adminGetData, adminUpdateSettings, adminDecideParent, adminResetStudent, adminTestBot, adminUnban, adminResolveAlert,
   adminDeleteParent, adminAddPerson, adminEditPerson, adminRemovePerson, adminUpdateStudentHandle,
 } from "@/lib/portal.functions";
-import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw, AtSign } from "lucide-react";
+import { ShieldCheck, X, ShieldAlert, Plus, Pencil, Trash2, RotateCcw, AtSign, Users, GraduationCap, Presentation, CalendarClock, Bell, Megaphone, ClipboardCheck, Settings, type LucideIcon } from "lucide-react";
+
+const TAB_ICONS: Record<string, LucideIcon> = { security: ShieldAlert, parents: Users, students: GraduationCap, teachers: Presentation, registrations: CalendarClock, notifications: Bell, broadcast: Megaphone, "exam test": ClipboardCheck, settings: Settings };
 import { GlassIcon } from "./GlassIcon";
 
 type Data = Awaited<ReturnType<typeof adminGetData>>;
@@ -119,9 +121,9 @@ function Dashboard({ token, onLogout }: { token: string; onLogout: () => void })
         <Stat label="Pending parents" value={pending.length} />
         <Stat label="Locked names" value={banned.length} />
       </div>
-      <div className="mt-5 flex gap-2 overflow-x-auto">
+      <div className="tab-scroller mt-5 flex snap-x gap-2 overflow-x-auto rounded-2xl border bg-secondary/40 p-1.5">
         {(["security", "parents", "students", "teachers", "registrations", "notifications", "broadcast", "exam test", "settings"] as View[]).map((v) => (
-          <Button key={v} variant={view === v ? "default" : "outline"} onClick={() => { setView(v); setQ(""); }} className="shrink-0 whitespace-nowrap text-sm capitalize">{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</Button>
+          <Button key={v} variant="ghost" onClick={() => { setView(v); setQ(""); }} className={`shrink-0 snap-start gap-2 whitespace-nowrap rounded-xl text-sm capitalize ${view === v ? "glow bg-primary/15 text-primary hover:bg-primary/20" : "text-muted-foreground hover:text-foreground"}`}>{(() => { const I = TAB_ICONS[v]!; return <I size={16} />; })()}{v}{v === "security" && openAlerts.length > 0 ? ` (${openAlerts.length})` : ""}</Button>
         ))}
       </div>
 
