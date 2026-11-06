@@ -512,7 +512,7 @@ export const adminBroadcast = createServerFn({ method: "POST" })
       for (const ok of results) ok ? sent++ : failed++;
       await new Promise((r) => setTimeout(r, 400));
     }
-    return { sent, failed, total: list.length };
+    return { sent, failed, total: list.length, notFound };
   });
 
 // ---------- Grade 12 exam portal testers ----------
