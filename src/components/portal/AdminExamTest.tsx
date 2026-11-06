@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
-import { adminExamTesters, adminSetExamDeadline, adminSetExamBenefits, adminSetExamMode, adminRemoveExamTester, adminResetExamPick } from "@/lib/portal.functions";
-import { RotateCcw, Lock, Unlock, Timer } from "lucide-react";
+import { adminExamTesters, adminSetExamDeadline, adminSetExamBenefits, adminSetExamMode, adminRemoveExamTester, adminResetExamPick, adminSetExamVisible, adminPickExamTesters } from "@/lib/portal.functions";
+import { RotateCcw, Lock, Unlock, Timer, Eye, EyeOff, UserCheck } from "lucide-react";
 
 type Data = Awaited<ReturnType<typeof adminExamTesters>>;
 
@@ -17,6 +17,9 @@ export function ExamTestPanel({ token }: { token: string }) {
   const setMode = useServerFn(adminSetExamMode);
   const removeT = useServerFn(adminRemoveExamTester);
   const resetPick = useServerFn(adminResetExamPick);
+  const setVisible = useServerFn(adminSetExamVisible);
+  const pickManual = useServerFn(adminPickExamTesters);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
   const act = async (fn: () => Promise<unknown>, msg: string) => { try { await fn(); toast.success(msg); load(); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); } };
   const load = useCallback(() => get({ data: { token } }).then(setD).catch(() => toast.error("Could not load")), [get, token]);
   useEffect(() => { load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [load]);
@@ -35,6 +38,12 @@ export function ExamTestPanel({ token }: { token: string }) {
           ))}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">Automatic opens sign-up and picks 15 at the deadline. Open/Close now override it manually.</p>
+        <div className="mt-3">
+          <Button size="sm" variant="ghost" className="gap-1.5 border border-border" onClick={() => act(() => setVisible({ data: { token, visible: !d.visible } }), d.visible ? "Exam test tab hidden from the home page" : "Exam test tab shown on the home page")}>
+            {d.visible ? <><EyeOff size={15} /> Hide from home page</> : <><Eye size={15} /> Show on home page</>}
+          </Button>
+          <p className="mt-1 text-xs text-muted-foreground">Currently {d.visible ? "visible" : "hidden"} to users. Hiding does not close sign-up — students with the link can still sign up.</p>
+        </div>
         {d.pickedAt && <Button variant="ghost" className="mt-3 gap-1.5 border border-border text-warning hover:bg-warning/10" onClick={() => confirm("Clear the current pick so a new deadline can pick again? Sign-ups are kept.") && act(() => resetPick({ data: { token } }), "Pick cleared")}><RotateCcw size={15} /> Reset pick</Button>}
         {!d.pickedAt && (
           <div className="mt-3 flex flex-wrap gap-2">
