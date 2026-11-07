@@ -38,10 +38,11 @@ function Index() {
   const [tab, setTab] = useState<Tab | null>(null);
   const [support, setSupport] = useState("@bhsss_admin");
   const [sections, setSections] = useState<Record<string, string[]>>({});
+  const [examVisible, setExamVisible] = useState(true);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("tab") === "examtest") setTab("examtest");
-    getPublicSettings().then((s) => { setSupport(s.support_handle); setSections(s.sections); }).catch(() => {});
+    getPublicSettings().then((s) => { setSupport(s.support_handle); setSections(s.sections); setExamVisible(s.exam_test_visible); }).catch(() => {});
   }, []);
 
   const supportUrl = `https://t.me/${support.replace(/^@/, "")}`;
@@ -63,7 +64,7 @@ function Index() {
       </header>
 
       <nav className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.id !== "examtest" || examVisible).map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -85,7 +86,12 @@ function Index() {
         {tab === "student" && <StudentFlow key="s" sections={sections} supportUrl={supportUrl} support={support} />}
         {tab === "teacher" && <TeacherFlow key="t" supportUrl={supportUrl} support={support} />}
         {tab === "parent" && <ParentFlow key="p" supportUrl={supportUrl} support={support} />}
-        {tab === "examtest" && <ExamTestFlow key="e" supportUrl={supportUrl} />}
+        {tab === "examtest" && examVisible && <ExamTestFlow key="e" supportUrl={supportUrl} />}
+        {tab === "examtest" && !examVisible && (
+          <div className="glass rounded-2xl p-8 text-center text-muted-foreground">
+            This page is not available right now.
+          </div>
+        )}
         {tab === "admin" && <AdminArea key="a" onClose={() => setTab(null)} />}
       </main>
 
