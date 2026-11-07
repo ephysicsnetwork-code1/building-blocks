@@ -103,7 +103,7 @@ function List({ rows, showMsg, onRemove, selectable, chosen, onToggle }: { rows:
         <tbody>
           {rows.map((r) => (
             <tr key={r.telegram_handle} className="border-t">
-              {selectable && <td className="p-2"><input type="checkbox" aria-label={`Pick ${r.full_name}`} checked={chosen?.has(r.telegram_handle) ?? false} onChange={() => onToggle?.(r.telegram_handle)} />}</td>
+              {selectable && <td className="p-2"><input type="checkbox" aria-label={`Pick ${r.full_name}`} checked={chosen?.has(r.telegram_handle) ?? false} onChange={() => onToggle?.(r.telegram_handle)} /></td>}
               <td className="p-2">{r.full_name}{!showMsg && r.selected && <span className="ml-2 text-success">✓ picked</span>}</td>
               <td className="p-2">12{r.section}</td>
               <td className="p-2">{r.telegram_handle}</td>
